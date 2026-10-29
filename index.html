@@ -6,15 +6,10 @@
     <title>Finanças Pessoais - Davi</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Estilos adicionais para Modais */
-       
-        
-    </style>
 </head>
 <body>
 
@@ -26,10 +21,15 @@
                     <h1>Olá, Davi 👋</h1>
                     <p>Aqui está o resumo financeiro da sua conta hoje.</p>
                 </div>
-                <!-- Botão Dinâmico do Topo -->
-                <button class="btn-launch-header" id="btnActionHeader" onclick="executarAcaoHeader()">
-                    <i class="fa-solid fa-plus"></i> Novo Lançamento
-                </button>
+                <!-- Botões de Ação do Topo -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="btn-theme-toggle" id="btnThemeToggleHeader" onclick="alternarTema()" title="Alternar Modo Claro / Escuro">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    <button class="btn-launch-header" id="btnActionHeader" onclick="executarAcaoHeader()">
+                        <i class="fa-solid fa-plus"></i> Novo Lançamento
+                    </button>
+                </div>
             </header>
 
             <!-- ABA 1: FINANÇAS -->
@@ -55,130 +55,218 @@
 
                 <div class="dashboard-grid">
                     <!-- Gráfico Principal de Evolução Mensal -->
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 10px;">
-        <h3 style="font-size: 1rem; color: var(--text-muted); margin: 0;">Evolução Financeira nos Últimos Meses</h3>
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1rem; color: var(--text-muted); margin: 0;">Evolução Financeira nos Últimos Meses</h3>
+                            
+                            <!-- Filtros do Gráfico -->
+                            <div class="type-selector" style="margin: 0; width: auto; font-size: 0.8rem;">
+                                <button class="type-btn active" id="btnFiltroAmbos" onclick="filtrarGrafico('ambos', this)">Ambos</button>
+                                <button class="type-btn" id="btnFiltroSaidas" onclick="filtrarGrafico('saidas', this)">Saídas</button>
+                                <button class="type-btn" id="btnFiltroEntradas" onclick="filtrarGrafico('entradas', this)">Entradas</button>
+                            </div>
+                        </div>
+                        <canvas id="chartEvolucao" height="140"></canvas>
+                    </div>
+
+                    <!-- Alocação da Carteira por Setor -->
+                    <div class="card">
+                        <h3 style="margin-bottom: 1.2rem; font-size: 1rem; color: var(--text-muted);">
+                            <i class="fa-solid fa-chart-pie"></i> Carteira por Setor
+                        </h3>
+                        <div style="position: relative; height: 220px; display: flex; justify-content: center; align-items: center;">
+                            <canvas id="chartSetores"></canvas>
+                        </div>
+                        <div id="listaSetoresResumo" style="margin-top: 1rem; font-size: 0.85rem; max-height: 120px; overflow-y: auto;">
+                            <!-- Lista com porcentagens e valores inserida via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+<!-- ABA 2: LANÇAR GASTO -->
+<div id="tab-lancamento" class="tab-content">
+    <div class="launch-container">
+        <h2 style="margin-bottom: 1.5rem; text-align: center;">Lançamento Rápido</h2>
         
-        <!-- Filtros do Gráfico -->
-        <div class="type-selector" style="margin: 0; width: auto; font-size: 0.8rem;">
-            <button class="type-btn active" id="btnFiltroAmbos" onclick="filtrarGrafico('ambos', this)">Ambos</button>
-            <button class="type-btn" id="btnFiltroSaidas" onclick="filtrarGrafico('saidas', this)">Saídas</button>
-            <button class="type-btn" id="btnFiltroEntradas" onclick="filtrarGrafico('entradas', this)">Entradas</button>
+        <div class="type-selector">
+            <button class="type-btn active saida" onclick="setType('saida', this)">Saída (Gasto)</button>
+            <button class="type-btn entrada" onclick="setType('entrada', this)">Entrada (Receita)</button>
+        </div>
+
+        <div class="form-group">
+            <label>Valor da Transação (R$)</label>
+            <input type="number" id="inputValor" class="form-control big-input" placeholder="0,00" step="0.01">
+            <div class="quick-amounts">
+                <button class="btn-quick-amount" onclick="addValor(10)">+ R$ 10</button>
+                <button class="btn-quick-amount" onclick="addValor(50)">+ R$ 50</button>
+                <button class="btn-quick-amount" onclick="addValor(100)">+ R$ 100</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="inputDescricao" class="form-control" placeholder="Ex: Almoço, Mercado...">
+        </div>
+
+       <!-- LINHA DE CAMPOS DO FORMULÁRIO -->
+<div class="form-row-2" id="linhaFormularioDuplo">
+    <!-- Meio de Pagamento (Exibido apenas em Saída) -->
+    <div class="form-group" id="groupMeioPagamento">
+        <label>Meio de Pagamento</label>
+        <select class="form-control" id="selectMeio" onchange="toggleCartoes(this.value)">
+            <option value="PIX">PIX / Débito Conta</option>
+            <option value="CREDITO">Cartão de Crédito</option>
+            <option value="DINHEIRO">Dinheiro / Espécie</option>
+        </select>
+    </div>
+
+    <!-- Categoria exclusiva de SAÍDA -->
+    <div class="form-group" id="groupCategoriaSaida">
+        <label>Categoria / Seção</label>
+        <select class="form-control" id="selectCategoriaSaida">
+            <option value="Geral">Geral</option>
+            <option value="Alimentação & Mercado">Alimentação & Mercado</option>
+            <option value="Lazer & Entretenimento">Lazer & Entretenimento</option>
+            <option value="Assinaturas & Serviços">Assinaturas & Serviços</option>
+            <option value="Transporte">Transporte</option>
+        </select>
+    </div>
+
+    <!-- Categoria exclusiva de ENTRADA (Inicia oculta) -->
+    <div class="form-group" id="groupCategoriaEntrada" style="display: none;">
+        <label>Categoria / Seção</label>
+        <select class="form-control" id="selectCategoriaEntrada">
+            <option value="Salário Aulas">Salário Aulas</option>
+            <option value="Salário Emprego">Salário Emprego</option>
+            <option value="Proventos">Proventos</option>
+            <option value="Aluguel de ações">Aluguel de ações</option>
+        </select>
+    </div>
+</div>
+
+        <!-- Seletor Dinâmico de Cartão de Crédito -->
+        <div class="form-group" id="groupCartoes" style="display: none; animation: fadeIn 0.25s ease;">
+            <label style="display: flex; justify-content: space-between; align-items: center;">
+                <span><i class="fa-solid fa-credit-card"></i> Qual Cartão de Crédito?</span>
+                <a href="javascript:void(0)" onclick="switchTab('tab-cartoes', document.querySelectorAll('.nav-item')[2])" style="font-size: 0.85rem; color: var(--forest-primary); text-decoration: underline;">+ Gerenciar</a>
+            </label>
+            <select class="form-control" id="selectCartao">
+                <option value="">Selecione o cartão...</option>
+            </select>
+        </div>
+
+        <!-- Seletor de Parcelas -->
+        <div class="form-group" id="groupParcelas" style="display: none; animation: fadeIn 0.25s ease;">
+            <label>Número de Parcelas</label>
+            <select class="form-control" id="selectParcelas">
+                <option value="1">1x (À vista)</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+                <option value="4">4x</option>
+                <option value="5">5x</option>
+                <option value="6">6x</option>
+                <option value="10">10x</option>
+                <option value="12">12x</option>
+            </select>
+        </div>
+
+        <!-- BOTÃO DE SUBMIT (FORA DAS LINHAS GRID DE CAMPOS) -->
+        <div style="width: 100%; clear: both;">
+            <button class="btn-submit" onclick="salvarLancamento(event)"><i class="fa-solid fa-check"></i> Confirmar Lançamento</button>
+        </div>
+
+        <!-- TABELA DE ÚLTIMOS LANÇAMENTOS -->
+        <div style="margin-top: 2.5rem; width: 100%;">
+            <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 0.8rem;">Últimos Lançamentos Registrados</h3>
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Descrição</th>
+                        <th>Meio</th>
+                        <th>Categoria</th>
+                        <th>Valor</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyLancamentos">
+                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum lançamento registrado.</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
-    <canvas id="chartEvolucao" height="140"></canvas>
 </div>
-                    <div class="card">
-                        <h3 style="margin-bottom: 1.2rem; font-size: 1rem; color: var(--text-muted);">Limites de Gastos (Seções)</h3>
-                        <div id="containerLimites">
-                            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 2rem;">Nenhum limite cadastrado.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ABA 2: LANÇAR GASTO -->
-            <div id="tab-lancamento" class="tab-content">
-                <div class="launch-container">
-                    <h2 style="margin-bottom: 1.5rem; text-align: center;">Lançamento Rápido</h2>
-                    
-                    <div class="type-selector">
-                        <button class="type-btn active saida" onclick="setType('saida', this)">Saída (Gasto)</button>
-                        <button class="type-btn entrada" onclick="setType('entrada', this)">Entrada (Receita)</button>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Valor da Transação (R$)</label>
-                        <input type="number" id="inputValor" class="form-control big-input" placeholder="0,00" step="0.01">
-                        <div class="quick-amounts">
-                            <button class="btn-quick-amount" onclick="addValor(10)">+ R$ 10</button>
-                            <button class="btn-quick-amount" onclick="addValor(50)">+ R$ 50</button>
-                            <button class="btn-quick-amount" onclick="addValor(100)">+ R$ 100</button>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Descrição</label>
-                        <input type="text" id="inputDescricao" class="form-control" placeholder="Ex: Almoço, Mercado...">
-                    </div>
-
-                    <div class="form-row-2">
-                        <div class="form-group">
-                            <label>Meio de Pagamento</label>
-                            <select class="form-control" id="selectMeio" onchange="toggleCartoes(this.value)">
-                                <option value="PIX">PIX / Débito Conta</option>
-                                <option value="CREDITO">Cartão de Crédito</option>
-                                <option value="DINHEIRO">Dinheiro / Espécie</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group" id="groupCartoes" style="display: none;">
-                            <label>Qual Cartão de Crédito?</label>
-                            <select class="form-control">
-                                <option>Cartão Principal</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group" id="groupCategoria">
-                            <label>Categoria / Seção</label>
-                            <select class="form-control">
-                                <option>Geral</option>
-                                <option>Alimentação & Mercado</option>
-                                <option>Lazer & Entretenimento</option>
-                                <option>Assinaturas & Serviços</option>
-                                <option>Transporte</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <button class="btn-submit"><i class="fa-solid fa-check"></i> Confirmar Lançamento</button>
-
-                    <div style="margin-top: 2.5rem;">
-                        <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 0.8rem;">Últimos Lançamentos Registrados</h3>
-                        <table class="custom-table">
-                            <thead>
-                                <tr>
-                                    <th>Descrição</th>
-                                    <th>Meio</th>
-                                    <th>Categoria</th>
-                                    <th>Valor</th>
-                                    <th>Ação</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbodyLancamentos">
-                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum lançamento registrado.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
 
             <!-- ABA 3: INVESTIMENTOS -->
             <div id="tab-investimentos" class="tab-content">
-                <div class="cards-grid-4">
-                    <div class="card">
-                        <div class="card-title">Patrimônio Investido</div>
-                        <div class="card-value" id="totalInvestido" style="color: var(--forest-accent);">R$ 0,00</div>
-                    </div>
-                </div>
+                <div class="investimentos-grid">
+                    
+                    <!-- Coluna Esquerda: Todas as Ações da Carteira -->
+                    <div class="investimentos-col-left">
+                        <div class="card" style="margin-bottom: 1.2rem;">
+                            <div class="card-title">Patrimônio Investido <i class="fa-solid fa-wallet" style="color: var(--forest-accent);"></i></div>
+                            <div class="card-value" id="totalInvestido" style="color: var(--forest-accent);">R$ 0,00</div>
+                        </div>
 
-                <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Minha Carteira de Ativos</h3>
-                    <table class="custom-table">
-                        <thead>
-                            <tr>
-                                <th>Ticker</th>
-                                <th>Setor</th>
-                                <th>Quantidade</th>
-                                <th>Preço Médio</th>
-                                <th>Total Investido</th>
-                                <th style="text-align: center;">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tbodyInvestimentos">
-                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum ativo cadastrado.</td></tr>
-                        </tbody>
-                    </table>
+                        <div class="card">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3 style="font-size: 1rem; color: var(--text-muted); margin: 0;">
+                                    <i class="fa-solid fa-layer-group"></i> Minha Carteira de Ações
+                                </h3>
+                                <span id="badgeTotalAtivos" style="font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 12px; color: var(--text-muted);">0 ativos</span>
+                            </div>
+
+                            <div style="overflow-x: auto;">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Ticker</th>
+                                            <th>Setor</th>
+                                            <th onclick="ordenarInvestimentos('quantidade')" style="cursor: pointer; user-select: none;">
+                                                Qtd <span id="sort-icon-quantidade" style="font-size: 0.75rem; opacity: 0.4;">↕</span>
+                                            </th>
+                                            <th onclick="ordenarInvestimentos('preco_medio')" style="cursor: pointer; user-select: none;">
+                                                Preço Médio <span id="sort-icon-preco_medio" style="font-size: 0.75rem; opacity: 0.4;">↕</span>
+                                            </th>
+                                            <th onclick="ordenarInvestimentos('total')" style="cursor: pointer; user-select: none;">
+                                                Total <span id="sort-icon-total" style="font-size: 0.75rem; opacity: 0.4;">↕</span>
+                                            </th>
+                                            <th style="text-align: center;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbodyInvestimentos">
+                                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum ativo cadastrado.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Coluna Direita: Dashboard Interativo (Por Setor ou Por Ação) -->
+                    <div class="investimentos-col-right">
+                        <div class="card">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 10px;">
+                                <h3 style="font-size: 1rem; color: var(--text-muted); margin: 0;">
+                                    <i class="fa-solid fa-chart-pie"></i> Dashboard da Carteira
+                                </h3>
+                                
+                                <!-- Alternador: Por Setor vs Por Ação -->
+                                <div class="type-selector" style="margin: 0; width: auto; font-size: 0.8rem;">
+                                    <button class="type-btn active" id="btnDashSetor" onclick="alternarDashboardInvestimentos('setor', this)">Por Setor</button>
+                                    <button class="type-btn" id="btnDashAcao" onclick="alternarDashboardInvestimentos('acao', this)">Por Ação</button>
+                                </div>
+                            </div>
+
+                            <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
+                                <canvas id="chartInvestimentosDash"></canvas>
+                            </div>
+
+                            <div id="listaInvestimentosDashboard" style="margin-top: 1.2rem; font-size: 0.85rem; max-height: 250px; overflow-y: auto;">
+                                <!-- Detalhamento com valores e porcentagens gerado via JS -->
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -187,6 +275,41 @@
                 <h2 style="margin-bottom: 1.5rem;">Meus Objetivos & Metas</h2>
                 <div class="metas-grid" id="gridMetas">
                     <p style="color: var(--text-muted);">Nenhuma meta cadastrada ainda.</p>
+                </div>
+            </div>
+
+            <!-- ABA 5: CARTÕES DE CRÉDITO -->
+            <div id="tab-cartoes" class="tab-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h2 style="font-size: 1.6rem; color: var(--forest-primary); margin-bottom: 4px;">Meus Cartões de Crédito</h2>
+                        <p style="color: var(--text-muted); font-size: 0.95rem;">Gerencie seus cartões, limites e datas de fatura.</p>
+                    </div>
+                    <button class="btn-launch-header" onclick="abrirModalCartao()">
+                        <i class="fa-solid fa-plus"></i> Novo Cartão
+                    </button>
+                </div>
+
+                <div class="cards-grid-4" style="margin-bottom: 1.5rem;">
+                    <div class="card">
+                        <div class="card-title">Limite Total Combinado <i class="fa-solid fa-credit-card" style="color: var(--forest-light);"></i></div>
+                        <div class="card-value" id="cardTotalLimiteCartoes" style="color: var(--forest-light);">R$ 0,00</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Cartões Cadastrados <i class="fa-solid fa-layer-group"></i></div>
+                        <div class="card-value" id="cardQtdCartoes">0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+                        <h3 style="font-size: 1rem; color: var(--text-muted); margin: 0;">
+                            <i class="fa-solid fa-wallet"></i> Carteira de Cartões
+                        </h3>
+                    </div>
+                    <div id="gridCartoes" class="cartoes-grid-cards">
+                        <p style="color: var(--text-muted); text-align: center; grid-column: 1 / -1; padding: 2rem 0;">Nenhum cartão cadastrado ainda.</p>
+                    </div>
                 </div>
             </div>
 
@@ -199,16 +322,22 @@
                 <ul class="nav-menu">
                     <li class="nav-item active" onclick="switchTab('tab-financas', this)"><i class="fa-solid fa-house"></i> Finanças</li>
                     <li class="nav-item" onclick="switchTab('tab-lancamento', this)"><i class="fa-solid fa-pen-to-square"></i> Lançar Gasto</li>
+                    <li class="nav-item" onclick="switchTab('tab-cartoes', this)"><i class="fa-solid fa-credit-card"></i> Cartões</li>
                     <li class="nav-item" onclick="switchTab('tab-investimentos', this)"><i class="fa-solid fa-arrow-trend-up"></i> Investimentos</li>
                     <li class="nav-item" onclick="switchTab('tab-metas', this)"><i class="fa-solid fa-bullseye"></i> Metas</li>
                 </ul>
             </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">Software Pessoal v1.0</div>
+            <div class="sidebar-footer">
+                <button class="btn-theme-toggle" id="btnThemeToggle" onclick="alternarTema()">
+                    <i class="fa-solid fa-moon"></i> <span>Modo Escuro</span>
+                </button>
+                <div class="version-label">Software Pessoal v1.0</div>
+            </div>
         </aside>
 
     </div>
 
-    <!-- MODAL FAZER APORTE -->
+  <!-- MODAL FAZER APORTE -->
     <div class="modal-overlay" id="modalAporte">
         <div class="modal-card">
             <h3 style="margin-bottom: 1.2rem;">Fazer Aporte / Comprar Ativo</h3>
@@ -219,6 +348,11 @@
             <div class="form-group">
                 <label>Setor da Ação</label>
                 <input type="text" id="inputSetor" class="form-control" placeholder="Ex: Bancos, Petróleo, Energia...">
+            </div>
+            <!-- ADICIONAR ESTA DIV -->
+            <div class="form-group">
+                <label>Cor Identificadora do Ativo</label>
+                <input type="color" id="inputCorAtivo" class="form-control" value="#2d6a4f" style="height: 45px; padding: 4px; cursor: pointer;">
             </div>
             <div class="form-group">
                 <label>Quantidade de Ações</label>
@@ -261,92 +395,129 @@
             </div>
         </div>
     </div>
+
     <!-- MODAL ADICIONAR PROGRESSO NA META -->
-<div class="modal-overlay" id="modalProgressoMeta">
-    <div class="modal-card">
-        <h3 style="margin-bottom: 0.5rem;" id="tituloProgressoMeta">Adicionar Progresso</h3>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.2rem;" id="subtituloProgressoMeta">
-            Informe o valor que você deseja guardar para esta meta.
-        </p>
+    <div class="modal-overlay" id="modalProgressoMeta">
+        <div class="modal-card">
+            <h3 style="margin-bottom: 0.5rem;" id="tituloProgressoMeta">Adicionar Progresso</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.2rem;" id="subtituloProgressoMeta">
+                Informe o valor que você deseja guardar para esta meta.
+            </p>
 
-        <input type="hidden" id="progressoMetaId">
+            <input type="hidden" id="progressoMetaId">
 
-        <div class="form-group">
-            <label>Valor a Adicionar (R$)</label>
-            <input type="number" id="inputValorProgresso" class="form-control big-input" placeholder="0,00" step="0.01">
-            <div class="quick-amounts">
-                <button class="btn-quick-amount" onclick="addValorProgresso(50)">+ R$ 50</button>
-                <button class="btn-quick-amount" onclick="addValorProgresso(100)">+ R$ 100</button>
-                <button class="btn-quick-amount" onclick="addValorProgresso(500)">+ R$ 500</button>
+            <div class="form-group">
+                <label>Valor a Adicionar (R$)</label>
+                <input type="number" id="inputValorProgresso" class="form-control big-input" placeholder="0,00" step="0.01">
+                <div class="quick-amounts">
+                    <button class="btn-quick-amount" onclick="addValorProgresso(50)">+ R$ 50</button>
+                    <button class="btn-quick-amount" onclick="addValorProgresso(100)">+ R$ 100</button>
+                    <button class="btn-quick-amount" onclick="addValorProgresso(500)">+ R$ 500</button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
+                <button class="btn-submit" onclick="confirmarProgressoMeta()">
+                    <i class="fa-solid fa-check"></i> Confirmar Aporte
+                </button>
+                <button class="btn-submit" style="background: var(--bg-hover);" onclick="fecharModais()">
+                    Cancelar
+                </button>
             </div>
         </div>
+    </div>
 
-        <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
-            <button class="btn-submit" onclick="confirmarProgressoMeta()">
-                <i class="fa-solid fa-check"></i> Confirmar Aporte
-            </button>
-            <button class="btn-submit" style="background: var(--bg-hover);" onclick="fecharModais()">
-                Cancelar
-            </button>
+    <!-- MODAL EDITAR META -->
+    <div class="modal-overlay" id="modalEditarMeta">
+        <div class="modal-card">
+            <h3 style="margin-bottom: 1.2rem;">Editar Meta</h3>
+            <input type="hidden" id="editMetaId">
+            
+            <div class="form-group">
+                <label>Título da Meta</label>
+                <input type="text" id="editMetaTitulo" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Valor Necessário (Objetivo)</label>
+                <input type="number" id="editMetaObjetivo" class="form-control" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Valor Atual Guardado (R$)</label>
+                <input type="number" id="editMetaAtual" class="form-control" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Até qual data quer alcançar? (Opcional)</label>
+                <input type="date" id="editMetaData" class="form-control">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
+                <button class="btn-submit" onclick="salvarEdicaoMeta()"><i class="fa-solid fa-check"></i> Salvar Alterações</button>
+                <button class="btn-submit" style="background: var(--bg-hover);" onclick="fecharModais()">Cancelar</button>
+            </div>
         </div>
     </div>
-</div>
-<!-- MODAL EDITAR META -->
-<div class="modal-overlay" id="modalEditarMeta">
-    <div class="modal-card">
-        <h3 style="margin-bottom: 1.2rem;">Editar Meta</h3>
-        <input type="hidden" id="editMetaId">
-        
-        <div class="form-group">
-            <label>Título da Meta</label>
-            <input type="text" id="editMetaTitulo" class="form-control">
-        </div>
-        <div class="form-group">
-            <label>Valor Necessário (Objetivo)</label>
-            <input type="number" id="editMetaObjetivo" class="form-control" step="0.01">
-        </div>
-        <div class="form-group">
-            <label>Valor Atual Guardado (R$)</label>
-            <input type="number" id="editMetaAtual" class="form-control" step="0.01">
-        </div>
-        <div class="form-group">
-            <label>Até qual data quer alcançar? (Opcional)</label>
-            <input type="date" id="editMetaData" class="form-control">
-        </div>
 
-        <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
-            <button class="btn-submit" onclick="salvarEdicaoMeta()"><i class="fa-solid fa-check"></i> Salvar Alterações</button>
-            <button class="btn-submit" style="background: var(--bg-hover);" onclick="fecharModais()">Cancelar</button>
-        </div>
-    </div>
-</div>
     <!-- MODAL EDITAR ATIVO -->
-<div class="modal-overlay" id="modalEditarAtivo">
-    <div class="modal-card">
-        <h3 style="margin-bottom: 1.2rem;">Editar Ativo</h3>
-        <input type="hidden" id="editAtivoId">
-        <div class="form-group">
-            <label>Ticker da Ação / Ativo</label>
-            <input type="text" id="editTicker" class="form-control" disabled style="opacity: 0.6;">
-        </div>
-        <div class="form-group">
-            <label>Setor da Ação</label>
-            <input type="text" id="editSetor" class="form-control">
-        </div>
-        <div class="form-group">
-            <label>Quantidade de Ações</label>
-            <input type="number" id="editQtd" class="form-control" step="0.0001">
-        </div>
-        <div class="form-group">
-            <label>Preço Médio (R$)</label>
-            <input type="number" id="editPrecoMedio" class="form-control" step="0.01">
-        </div>
-        <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
-            <button class="btn-submit" onclick="salvarEdicaoAtivo()"><i class="fa-solid fa-check"></i> Salvar Alterações</button>
-            <button class="btn-submit" style="background: var(--bg-hover);" onclick="fecharModais()">Cancelar</button>
+    <div class="modal-overlay" id="modalEditarAtivo">
+        <div class="modal-card">
+            <h3 style="margin-bottom: 1.2rem;">Editar Ativo</h3>
+            <input type="hidden" id="editAtivoId">
+            <div class="form-group">
+                <label>Ticker da Ação / Ativo</label>
+                <input type="text" id="editTicker" class="form-control" disabled style="opacity: 0.6;">
+            </div>
+            <div class="form-group">
+                <label>Setor da Ação</label>
+                <input type="text" id="editSetor" class="form-control">
+            </div>
+            <!-- ADICIONAR ESTA DIV -->
+            <div class="form-group">
+                <label>Cor Identificadora do Ativo</label>
+                <input type="color" id="editCorAtivo" class="form-control" value="#2d6a4f" style="height: 45px; padding: 4px; cursor: pointer;">
+            </div>
+            <div class="form-group">
+                <label>Quantidade de Ações</label>
+                <input type="number" id="editQtd" class="form-control" step="0.0001">
+            </div>
+            <div class="form-group">
+                <label>Preço Médio (R$)</label>
+                <input type="number" id="editPrecoMedio" class="form-control" step="0.01">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
+                <button class="btn-submit" onclick="salvarEdicaoAtivo()"><i class="fa-solid fa-check"></i> Salvar Alterações</button>
+                <button class="btn-submit" style="background: var(--bg-hover);" onclick="fecharModais()">Cancelar</button>
+            </div>
         </div>
     </div>
-</div>
+
+    <!-- MODAL NOVO CARTÃO DE CRÉDITO -->
+    <div class="modal-overlay" id="modalCartao">
+        <div class="modal-card">
+            <h3 style="margin-bottom: 1.2rem;">Adicionar Cartão de Crédito</h3>
+            <div class="form-group">
+                <label>Nome do Cartão / Banco</label>
+                <input type="text" id="inputNomeCartao" class="form-control" placeholder="Ex: Nubank Mastercard, XP Visa Infinite...">
+            </div>
+            <div class="form-group">
+                <label>Limite Total de Crédito (R$)</label>
+                <input type="number" id="inputLimiteCartao" class="form-control" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-row-2">
+                <div class="form-group">
+                    <label>Dia do Fechamento</label>
+                    <input type="number" id="inputFechamentoCartao" class="form-control" placeholder="Ex: 3" min="1" max="31">
+                </div>
+                <div class="form-group">
+                    <label>Dia do Vencimento</label>
+                    <input type="number" id="inputVencimentoCartao" class="form-control" placeholder="Ex: 10" min="1" max="31">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
+                <button class="btn-submit" onclick="salvarCartao()"><i class="fa-solid fa-check"></i> Salvar Cartão</button>
+                <button class="btn-submit" style="background: var(--bg-hover); color: var(--text-main);" onclick="fecharModais()">Cancelar</button>
+            </div>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
