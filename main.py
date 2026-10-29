@@ -2,12 +2,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pymysql
+import os
 from typing import Optional
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 
-app = FastAPI(title="API Finanças Pessoais")
 
+app = FastAPI(title="API Finanças Pessoais")
+@app.get("/")
+def home():
+    return {"mensagem": "API de Finanças Pessoais está no ar!"}
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,10 +22,11 @@ app.add_middleware(
 
 def get_db_connection():
     return pymysql.connect(
-        host='localhost',
-        user='root',
-        password='maosinho',
-        database='financas_davi',
+        host=os.getenv('DB_HOST', 'localhost'),
+        user=os.getenv('DB_USER', 'root'),
+        password=os.getenv('DB_PASSWORD', 'maosinho'),
+        database=os.getenv('DB_NAME', 'financas_davi'),
+        port=int(os.getenv('DB_PORT', 3306)),
         cursorclass=pymysql.cursors.DictCursor
     )
 
