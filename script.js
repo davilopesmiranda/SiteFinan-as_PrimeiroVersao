@@ -1,5 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
-
+const API_URL = "https://financas-api-2lm0.onrender.com";
 let currentTab = 'tab-financas';
 
 // ==========================================
