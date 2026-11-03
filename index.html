@@ -88,93 +88,110 @@
 <!-- ABA 2: LANÇAR GASTO -->
 <div id="tab-lancamento" class="tab-content">
     <div class="launch-container">
-        <h2 style="margin-bottom: 1.5rem; text-align: center;">Lançamento Rápido</h2>
+        <h2 style="margin-bottom: 1.5rem; text-align: center;">Lançamento de Transações</h2>
         
+        <!-- Três Botões de Modo -->
         <div class="type-selector">
             <button class="type-btn active saida" onclick="setType('saida', this)">Saída (Gasto)</button>
             <button class="type-btn entrada" onclick="setType('entrada', this)">Entrada (Receita)</button>
+            <button class="type-btn fatura" onclick="setType('fatura', this)"><i class="fa-solid fa-file-csv"></i> Importar Fatura</button>
         </div>
 
-        <div class="form-group">
-            <label>Valor da Transação (R$)</label>
-            <input type="number" id="inputValor" class="form-control big-input" placeholder="0,00" step="0.01">
-            <div class="quick-amounts">
-                <button class="btn-quick-amount" onclick="addValor(10)">+ R$ 10</button>
-                <button class="btn-quick-amount" onclick="addValor(50)">+ R$ 50</button>
-                <button class="btn-quick-amount" onclick="addValor(100)">+ R$ 100</button>
+        <!-- MODO MANUAL: SAÍDA E ENTRADA -->
+        <div id="containerLancamentoManual">
+            <div class="form-group">
+                <label>Valor da Transação (R$)</label>
+                <input type="number" id="inputValor" class="form-control big-input" placeholder="0,00" step="0.01">
+                <div class="quick-amounts">
+                    <button class="btn-quick-amount" onclick="addValor(10)">+ R$ 10</button>
+                    <button class="btn-quick-amount" onclick="addValor(50)">+ R$ 50</button>
+                    <button class="btn-quick-amount" onclick="addValor(100)">+ R$ 100</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Descrição</label>
+                <input type="text" id="inputDescricao" class="form-control" placeholder="Ex: Almoço, Mercado...">
+            </div>
+
+            <div class="form-row-2" id="linhaFormularioDuplo">
+                <div class="form-group" id="groupMeioPagamento">
+                    <label>Meio de Pagamento</label>
+                    <select class="form-control" id="selectMeio" onchange="toggleCartoes(this.value)">
+                        <option value="PIX">PIX / Débito Conta</option>
+                        <option value="CREDITO">Cartão de Crédito</option>
+                        <option value="DINHEIRO">Dinheiro / Espécie</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="groupCategoriaSaida">
+                    <label>Categoria / Seção</label>
+                    <select class="form-control" id="selectCategoriaSaida">
+                        <option value="Geral">Geral</option>
+                        <option value="Alimentação & Mercado">Alimentação & Mercado</option>
+                        <option value="Lazer & Entretenimento">Lazer & Entretenimento</option>
+                        <option value="Assinaturas & Serviços">Assinaturas & Serviços</option>
+                        <option value="Transporte">Transporte</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="groupCategoriaEntrada" style="display: none;">
+                    <label>Categoria / Seção</label>
+                    <select class="form-control" id="selectCategoriaEntrada">
+                        <option value="Salário Aulas">Salário Aulas</option>
+                        <option value="Salário Emprego">Salário Emprego</option>
+                        <option value="Proventos">Proventos</option>
+                        <option value="Aluguel de ações">Aluguel de ações</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" id="groupCartoes" style="display: none; animation: fadeIn 0.25s ease;">
+                <label style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fa-solid fa-credit-card"></i> Qual Cartão de Crédito?</span>
+                    <a href="javascript:void(0)" onclick="switchTab('tab-cartoes', document.querySelectorAll('.nav-item')[2])" style="font-size: 0.85rem; color: var(--forest-primary); text-decoration: underline;">+ Gerenciar</a>
+                </label>
+                <select class="form-control" id="selectCartao">
+                    <option value="">Selecione o cartão...</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="groupParcelas" style="display: none; animation: fadeIn 0.25s ease;">
+                <label>Número de Parcelas</label>
+                <select class="form-control" id="selectParcelas">
+                    <option value="1">1x (À vista)</option>
+                    <option value="2">2x</option>
+                    <option value="3">3x</option>
+                    <option value="4">4x</option>
+                    <option value="5">5x</option>
+                    <option value="6">6x</option>
+                    <option value="10">10x</option>
+                    <option value="12">12x</option>
+                </select>
+            </div>
+
+            <div style="width: 100%; clear: both;">
+                <button class="btn-submit" onclick="salvarLancamento(event)"><i class="fa-solid fa-check"></i> Confirmar Lançamento</button>
             </div>
         </div>
 
-        <div class="form-group">
-            <label>Descrição</label>
-            <input type="text" id="inputDescricao" class="form-control" placeholder="Ex: Almoço, Mercado...">
-        </div>
+        <!-- MODO IMPORTAÇÃO DE FATURA (INICIA OCULTO) -->
+        <div id="containerImportarFatura" style="display: none; animation: fadeIn 0.25s ease;">
+            <div class="form-group">
+                <label>Selecione o Cartão de Crédito</label>
+                <select class="form-control" id="selectCartaoImportar">
+                    <option value="">Selecione o cartão...</option>
+                </select>
+            </div>
 
-       <!-- LINHA DE CAMPOS DO FORMULÁRIO -->
-<div class="form-row-2" id="linhaFormularioDuplo">
-    <!-- Meio de Pagamento (Exibido apenas em Saída) -->
-    <div class="form-group" id="groupMeioPagamento">
-        <label>Meio de Pagamento</label>
-        <select class="form-control" id="selectMeio" onchange="toggleCartoes(this.value)">
-            <option value="PIX">PIX / Débito Conta</option>
-            <option value="CREDITO">Cartão de Crédito</option>
-            <option value="DINHEIRO">Dinheiro / Espécie</option>
-        </select>
-    </div>
+            <div class="form-group">
+                <label>Arquivo CSV da Fatura (ex: Banco Inter)</label>
+                <input type="file" id="inputFileCSV" accept=".csv" class="form-control">
+            </div>
 
-    <!-- Categoria exclusiva de SAÍDA -->
-    <div class="form-group" id="groupCategoriaSaida">
-        <label>Categoria / Seção</label>
-        <select class="form-control" id="selectCategoriaSaida">
-            <option value="Geral">Geral</option>
-            <option value="Alimentação & Mercado">Alimentação & Mercado</option>
-            <option value="Lazer & Entretenimento">Lazer & Entretenimento</option>
-            <option value="Assinaturas & Serviços">Assinaturas & Serviços</option>
-            <option value="Transporte">Transporte</option>
-        </select>
-    </div>
-
-    <!-- Categoria exclusiva de ENTRADA (Inicia oculta) -->
-    <div class="form-group" id="groupCategoriaEntrada" style="display: none;">
-        <label>Categoria / Seção</label>
-        <select class="form-control" id="selectCategoriaEntrada">
-            <option value="Salário Aulas">Salário Aulas</option>
-            <option value="Salário Emprego">Salário Emprego</option>
-            <option value="Proventos">Proventos</option>
-            <option value="Aluguel de ações">Aluguel de ações</option>
-        </select>
-    </div>
-</div>
-
-        <!-- Seletor Dinâmico de Cartão de Crédito -->
-        <div class="form-group" id="groupCartoes" style="display: none; animation: fadeIn 0.25s ease;">
-            <label style="display: flex; justify-content: space-between; align-items: center;">
-                <span><i class="fa-solid fa-credit-card"></i> Qual Cartão de Crédito?</span>
-                <a href="javascript:void(0)" onclick="switchTab('tab-cartoes', document.querySelectorAll('.nav-item')[2])" style="font-size: 0.85rem; color: var(--forest-primary); text-decoration: underline;">+ Gerenciar</a>
-            </label>
-            <select class="form-control" id="selectCartao">
-                <option value="">Selecione o cartão...</option>
-            </select>
-        </div>
-
-        <!-- Seletor de Parcelas -->
-        <div class="form-group" id="groupParcelas" style="display: none; animation: fadeIn 0.25s ease;">
-            <label>Número de Parcelas</label>
-            <select class="form-control" id="selectParcelas">
-                <option value="1">1x (À vista)</option>
-                <option value="2">2x</option>
-                <option value="3">3x</option>
-                <option value="4">4x</option>
-                <option value="5">5x</option>
-                <option value="6">6x</option>
-                <option value="10">10x</option>
-                <option value="12">12x</option>
-            </select>
-        </div>
-
-        <!-- BOTÃO DE SUBMIT (FORA DAS LINHAS GRID DE CAMPOS) -->
-        <div style="width: 100%; clear: both;">
-            <button class="btn-submit" onclick="salvarLancamento(event)"><i class="fa-solid fa-check"></i> Confirmar Lançamento</button>
+            <button class="btn-submit" onclick="enviarCSVFatura()">
+                <i class="fa-solid fa-upload"></i> Processar e Importar Fatura
+            </button>
         </div>
 
         <!-- TABELA DE ÚLTIMOS LANÇAMENTOS -->

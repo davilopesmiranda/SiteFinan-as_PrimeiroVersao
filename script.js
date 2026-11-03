@@ -124,43 +124,91 @@ function fecharModais() {
 
 // 2. Transações
 // Alteração na função setType para esconder Meio de Pagamento e Cartões em Entradas
+// 1. Alterna entre Saída, Entrada e Importar Fatura
 function setType(type, btn) {
-    document.querySelectorAll('.type-btn').forEach(b => b.className = 'type-btn');
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active', 'saida', 'entrada', 'fatura'));
     btn.classList.add('active', type);
 
-    const groupMeio = document.getElementById('groupMeioPagamento');
-    const groupCartoes = document.getElementById('groupCartoes');
-    const groupParcelas = document.getElementById('groupParcelas');
-    const groupCatSaida = document.getElementById('groupCategoriaSaida');
-    const groupCatEntrada = document.getElementById('groupCategoriaEntrada');
-    const linhaForm = document.getElementById('linhaFormularioDuplo');
+    const containerManual = document.getElementById('containerLancamentoManual');
+    const containerFatura = document.getElementById('containerImportarFatura');
 
-    if (type === 'entrada') {
-        // Esconde campos de Saída
-        if (groupMeio) groupMeio.style.display = 'none';
-        if (groupCartoes) groupCartoes.style.display = 'none';
-        if (groupParcelas) groupParcelas.style.display = 'none';
-        if (groupCatSaida) groupCatSaida.style.display = 'none';
-
-        // Mostra Categoria de Entrada
-        if (groupCatEntrada) groupCatEntrada.style.display = 'block';
-
-        // Ocupa 100% da largura da linha
-        if (linhaForm) linhaForm.style.gridTemplateColumns = '1fr';
+    if (type === 'fatura') {
+        // Exibe tela de importação e esconde lançamento manual
+        if (containerManual) containerManual.style.display = 'none';
+        if (containerFatura) containerFatura.style.display = 'block';
+        carregarCartoes(); // Garante que a lista de cartões esteja carregada
     } else {
-        // Mostra campos de Saída
-        if (groupMeio) groupMeio.style.display = 'block';
-        if (groupCatSaida) groupCatSaida.style.display = 'block';
+        // Exibe lançamento manual e esconde importação
+        if (containerManual) containerManual.style.display = 'block';
+        if (containerFatura) containerFatura.style.display = 'none';
 
-        // Esconde Categoria de Entrada
-        if (groupCatEntrada) groupCatEntrada.style.display = 'none';
+        const groupMeio = document.getElementById('groupMeioPagamento');
+        const groupCartoes = document.getElementById('groupCartoes');
+        const groupParcelas = document.getElementById('groupParcelas');
+        const groupCatSaida = document.getElementById('groupCategoriaSaida');
+        const groupCatEntrada = document.getElementById('groupCategoriaEntrada');
+        const linhaForm = document.getElementById('linhaFormularioDuplo');
 
-        // Volta a linha para 2 colunas
-        if (linhaForm) linhaForm.style.gridTemplateColumns = '1fr 1fr';
+        if (type === 'entrada') {
+            if (groupMeio) groupMeio.style.display = 'none';
+            if (groupCartoes) groupCartoes.style.display = 'none';
+            if (groupParcelas) groupParcelas.style.display = 'none';
+            if (groupCatSaida) groupCatSaida.style.display = 'none';
+            if (groupCatEntrada) groupCatEntrada.style.display = 'block';
+            if (linhaForm) linhaForm.style.gridTemplateColumns = '1fr';
+        } else {
+            if (groupMeio) groupMeio.style.display = 'block';
+            if (groupCatSaida) groupCatSaida.style.display = 'block';
+            if (groupCatEntrada) groupCatEntrada.style.display = 'none';
+            if (linhaForm) linhaForm.style.gridTemplateColumns = '1fr 1fr';
 
-        // Restaura cartões caso o meio seja CREDITO
-        const selectMeio = document.getElementById('selectMeio');
-        if (selectMeio) toggleCartoes(selectMeio.value);
+            const selectMeio = document.getElementById('selectMeio');
+            if (selectMeio) toggleCartoes(selectMeio.value);
+        }
+    }
+}
+
+// 2. Envia a fatura em CSV para o servidor
+async function enviarCSVFatura() {
+    const selectCartao = document.getElementById('selectCartaoImportar');
+    const fileInput = document.getElementById('inputFileCSV');
+
+    if (!selectCartao || !selectCartao.value) {
+        alert("Por favor, selecione qual cartão pertence a essa fatura!");
+        return;
+    }
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Selecione o arquivo .csv da sua fatura!");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('cartao_nome', selectCartao.value);
+    formData.append('arquivo', fileInput.files[0]);
+
+    try {
+        const response = await fetch(`${API_URL}/cartoes/importar-csv`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            const res = await response.json();
+            alert(res.mensagem);
+            fileInput.value = '';
+            
+            // Recarrega todos os dados
+            carregarTransacoes();
+            carregarResumoDashboard();
+            carregarGraficoEvolucao();
+        } else {
+            const err = await response.json();
+            alert(`Erro na importação: ${err.detail || 'Falha ao processar arquivo'}`);
+        }
+    } catch (error) {
+        console.error("Erro ao enviar CSV:", error);
+        alert("Erro ao conectar com o servidor.");
     }
 }
 

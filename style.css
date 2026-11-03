@@ -785,3 +785,7 @@ body {
     background: var(--danger);
     transform: scale(1.1);
 }
+.type-btn.active.fatura {
+    background-color: var(--warning);
+    color: white;
+}
