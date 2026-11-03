@@ -3,3 +3,4 @@ uvicorn
 pymysql
 pydantic
 python-dateutil
+python-multipart

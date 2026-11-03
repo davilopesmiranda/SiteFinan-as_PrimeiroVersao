@@ -1294,6 +1294,69 @@ async function apagarCartao(id, nome) {
         alert("Erro ao conectar com o servidor.");
     }
 }
+// Preenche o seletor de cartão no bloco de importação dentro de carregarCartoes()
+async function enviarCSVFatura() {
+    const selectCartao = document.getElementById('selectCartaoImportar');
+    const fileInput = document.getElementById('inputFileCSV');
+
+    if (!selectCartao || !selectCartao.value) {
+        alert("Por favor, selecione qual cartão pertence a essa fatura!");
+        return;
+    }
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Selecione o arquivo .csv da sua fatura!");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('cartao_nome', selectCartao.value);
+    formData.append('arquivo', fileInput.files[0]);
+
+    const selectImportar = document.getElementById('selectCartaoImportar');
+
+if (selectLancamento) {
+    selectLancamento.innerHTML = '<option value="">Selecione o cartão...</option>';
+    if (selectImportar) selectImportar.innerHTML = '<option value="">Selecione o cartão...</option>';
+
+    cartoes.forEach(c => {
+        const opt1 = document.createElement('option');
+        opt1.value = c.nome;
+        opt1.textContent = `${c.nome} (Vence dia ${c.dia_vencimento})`;
+        selectLancamento.appendChild(opt1);
+
+        if (selectImportar) {
+            const opt2 = document.createElement('option');
+            opt2.value = c.nome;
+            opt2.textContent = `${c.nome}`;
+            selectImportar.appendChild(opt2);
+        }
+    });
+}
+    try {
+        const response = await fetch(`${API_URL}/cartoes/importar-csv`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            const res = await response.json();
+            alert(res.mensagem);
+            fileInput.value = '';
+            
+            carregarCartoes();
+            carregarTransacoes();
+            carregarResumoDashboard();
+            carregarGraficoEvolucao();
+        } else {
+            const err = await response.json();
+            alert(`Erro na importação: ${err.detail}`);
+        }
+    } catch (error) {
+        console.error("Erro na requisição:", error);
+        alert("Erro ao conectar com o servidor.");
+    }
+}
 
 async function carregarCartoes() {
     try {

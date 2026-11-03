@@ -1,11 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pymysql
 import os
+import csv
 from typing import Optional
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
+import io
+import re
+from datetime import datetime
+from fastapi import UploadFile, File, Form, HTTPException
 
 
 app = FastAPI(title="API Finanças Pessoais")
@@ -30,6 +35,70 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
+@app.post("/cartoes/importar-csv")
+async def importar_csv_cartao(
+    cartao_nome: str = Form(...),
+    arquivo: UploadFile = File(...)
+):
+    try:
+        conteudo = await arquivo.read()
+        try:
+            texto = conteudo.decode('utf-8-sig') # Remove UTF-8 BOM automático
+        except UnicodeDecodeError:
+            texto = conteudo.decode('latin-1')
+
+        buffer = io.StringIO(texto)
+        leitor_csv = csv.reader(buffer, delimiter=',')
+        cabecalho = next(leitor_csv, None)  # Pula o cabeçalho: Data, Lançamento, Categoria, Tipo, Valor
+
+        connection = get_db_connection()
+        total_importados = 0
+        
+        with connection.cursor() as cursor:
+            sql = """
+                INSERT INTO transacoes (descricao, valor, tipo, meio_pagamento, data_transacao)
+                VALUES (%s, %s, 'SAIDA', %s, %s)
+            """
+            
+            for linha in leitor_csv:
+                if not linha or len(linha) < 5:
+                    continue
+                
+                raw_data = linha[0].strip()
+                desc_item = linha[1].strip()
+                tipo_item = linha[3].strip()
+                raw_valor = linha[4].strip()
+
+                # Ignora pagamentos de fatura ou estornos em crédito
+                if "pagamento" in tipo_item.lower() or "pagamento" in desc_item.lower():
+                    continue
+
+                # Trata o valor: Remove "R$", espaços, pontos de milhar e converte vírgula decimal
+                valor_limpo = re.sub(r'[^\d,-]', '', raw_valor).replace(',', '.')
+                try:
+                    valor_item = float(valor_limpo)
+                except ValueError:
+                    continue
+
+                # Formata a data de DD/MM/YYYY para YYYY-MM-DD
+                try:
+                    data_formatada = datetime.strptime(raw_data, '%d/%m/%Y').strftime('%Y-%m-%d')
+                except ValueError:
+                    data_formatada = datetime.now().strftime('%Y-%m-%d')
+
+                if valor_item > 0:
+                    meio_pagamento = f"Crédito ({cartao_nome.strip()})"
+                    cursor.execute(sql, (desc_item, valor_item, meio_pagamento, data_formatada))
+                    total_importados += 1
+
+            connection.commit()
+        connection.close()
+        
+        return {"mensagem": f"{total_importados} lançamentos importados com sucesso para o cartão {cartao_nome}!"}
+    
+    except Exception as e:
+        print("ERRO AO IMPORTAR CSV:", str(e))
+        raise HTTPException(status_code=500, detail=f"Erro ao processar fatura CSV: {str(e)}")
 # --- SCHEMAS (MODELOS DE DADOS) ---
 
 class TransacaoSchema(BaseModel):
