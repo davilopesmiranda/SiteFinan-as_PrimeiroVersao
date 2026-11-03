@@ -61,81 +61,7 @@ def corrigir_faturas_existentes():
         return {"mensagem": f"{afetados} lançamentos foram vinculados com sucesso ao cartão Inter!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-@app.post("/cartoes/importar-csv")
-async def importar_csv_cartao(
-    cartao_nome: Optional[str] = Form(None), # Torna opcional, pois vai fixar 'Inter'
-    arquivo: UploadFile = File(...)
-):
-    try:
-        conteudo = await arquivo.read()
-        try:
-            texto = conteudo.decode('utf-8-sig') # Trata BOM do UTF-8
-        except UnicodeDecodeError:
-            texto = conteudo.decode('latin-1')
 
-        buffer = io.StringIO(texto)
-        leitor_csv = csv.reader(buffer, delimiter=',')
-        cabecalho = next(leitor_csv, None)  # Pula o cabeçalho
-
-        connection = get_db_connection()
-        total_importados = 0
-        
-        # FIXO: Sempre vincula ao cartão chamado 'Inter'
-        NOME_CARTAO_FIXO = "Inter"
-        meio_pagamento_fixo = f"Crédito ({NOME_CARTAO_FIXO})"
-
-        with connection.cursor() as cursor:
-            # 1. Garante que o cartão 'Inter' exista no banco de dados
-            cursor.execute("SELECT id FROM cartoes WHERE LOWER(nome) = 'inter'")
-            cartao_existe = cursor.fetchone()
-            if not cartao_existe:
-                cursor.execute(
-                    "INSERT INTO cartoes (nome, limite, dia_vencimento, dia_fechamento) VALUES ('Inter', 5000.00, 10, 3)"
-                )
-
-            sql_insert = """
-                INSERT INTO transacoes (descricao, valor, tipo, meio_pagamento, data_transacao)
-                VALUES (%s, %s, 'SAIDA', %s, %s)
-            """
-            
-            for linha in leitor_csv:
-                if not linha or len(linha) < 5:
-                    continue
-                
-                raw_data = linha[0].strip()
-                desc_item = linha[1].strip()
-                tipo_item = linha[3].strip()
-                raw_valor = linha[4].strip()
-
-                # Ignora pagamentos de fatura ou estornos
-                if "pagamento" in tipo_item.lower() or "pagamento" in desc_item.lower():
-                    continue
-
-                # Trata o valor (converte R$, vírgulas e pontos)
-                valor_limpo = re.sub(r'[^\d,-]', '', raw_valor).replace(',', '.')
-                try:
-                    valor_item = float(valor_limpo)
-                except ValueError:
-                    continue
-
-                # Formata a data (DD/MM/YYYY para YYYY-MM-DD)
-                try:
-                    data_formatada = datetime.strptime(raw_data, '%d/%m/%Y').strftime('%Y-%m-%d')
-                except ValueError:
-                    data_formatada = datetime.now().strftime('%Y-%m-%d')
-
-                if valor_item > 0:
-                    cursor.execute(sql_insert, (desc_item, valor_item, meio_pagamento_fixo, data_formatada))
-                    total_importados += 1
-
-            connection.commit()
-        connection.close()
-        
-        return {"mensagem": f"{total_importados} lançamentos importados com sucesso para o cartão Inter!"}
-    
-    except Exception as e:
-        print("ERRO AO IMPORTAR CSV:", str(e))
-        raise HTTPException(status_code=500, detail=f"Erro ao processar fatura CSV: {str(e)}")
 # --- SCHEMAS (MODELOS DE DADOS) ---
 
 class TransacaoSchema(BaseModel):
@@ -559,37 +485,184 @@ def criar_tabela_cartoes():
     except Exception as e:
         print("Aviso ao verificar tabela cartoes:", e)
 
+import csv
+import io
+import re
+from datetime import datetime, date
+from dateutil.relativedelta import relativedelta
+from fastapi import UploadFile, File, Form, HTTPException
+
+# 1. IMPORTAÇÃO DO CSV: ATRIBUI TUDO AUTOMATICAMENTE AO CARTÃO INTER
+@app.post("/cartoes/importar-csv")
+async def importar_csv_cartao(
+    cartao_nome: str = Form(None), # Opcional, pois força 'Inter'
+    arquivo: UploadFile = File(...)
+):
+    try:
+        conteudo = await arquivo.read()
+        try:
+            texto = conteudo.decode('utf-8-sig') # Trata BOM do UTF-8
+        except UnicodeDecodeError:
+            texto = conteudo.decode('latin-1')
+
+        buffer = io.StringIO(texto)
+        leitor_csv = csv.reader(buffer, delimiter=',')
+        cabecalho = next(leitor_csv, None)  # Pula o cabeçalho
+
+        connection = get_db_connection()
+        total_importados = 0
+        
+        # FORÇA TODOS OS LANÇAMENTOS DO CSV PARA O CARTÃO "INTER"
+        NOME_CARTAO_FIXO = "Inter"
+        meio_pagamento_fixo = f"Crédito ({NOME_CARTAO_FIXO})"
+
+        with connection.cursor() as cursor:
+            # Garante que o cartão 'Inter' exista no banco com fechamento no dia 24
+            cursor.execute("SELECT id FROM cartoes WHERE LOWER(nome) = 'inter'")
+            cartao = cursor.fetchone()
+            if not cartao:
+                cursor.execute(
+                    "INSERT INTO cartoes (nome, limite, dia_vencimento, dia_fechamento) VALUES ('Inter', 2850.00, 18, 25)"
+                )
+            else:
+                # Atualiza o dia do fechamento para 24
+                cursor.execute("UPDATE cartoes SET dia_fechamento = 25 WHERE id = %s", (cartao['id'],))
+
+            sql_insert = """
+                INSERT INTO transacoes (descricao, valor, tipo, meio_pagamento, data_transacao)
+                VALUES (%s, %s, 'SAIDA', %s, %s)
+            """
+            
+            for linha in leitor_csv:
+                if not linha or len(linha) < 5:
+                    continue
+                
+                raw_data = linha[0].strip()
+                desc_item = linha[1].strip()
+                tipo_item = linha[3].strip()
+                raw_valor = linha[4].strip()
+
+                # Ignora pagamentos de fatura ou estornos
+                if "pagamento" in tipo_item.lower() or "pagamento" in desc_item.lower():
+                    continue
+
+                # Trata o valor (converte R$, vírgulas e pontos)
+                valor_limpo = re.sub(r'[^\d,-]', '', raw_valor).replace(',', '.')
+                try:
+                    valor_item = float(valor_limpo)
+                except ValueError:
+                    continue
+
+                # Formata a data (DD/MM/YYYY para YYYY-MM-DD)
+                try:
+                    data_formatada = datetime.strptime(raw_data, '%d/%m/%Y').strftime('%Y-%m-%d')
+                except ValueError:
+                    data_formatada = datetime.now().strftime('%Y-%m-%d')
+
+                if valor_item > 0:
+                    cursor.execute(sql_insert, (desc_item, valor_item, meio_pagamento_fixo, data_formatada))
+                    total_importados += 1
+
+            connection.commit()
+        connection.close()
+        
+        return {"mensagem": f"{total_importados} lançamentos importados e atribuídos com sucesso ao cartão Inter!"}
+    
+    except Exception as e:
+        print("ERRO AO IMPORTAR CSV:", str(e))
+        raise HTTPException(status_code=500, detail=f"Erro ao processar fatura CSV: {str(e)}")
+
+
+# 2. ROTA DE LISTAGEM COM CÁLCULO BASEADO NO FECHAMENTO (DIA 24)
 @app.get("/cartoes")
 def listar_cartoes():
     criar_tabela_cartoes()
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
-            mes_atual = datetime.now().month
-            ano_atual = datetime.now().year
-            
-            sql = """
-                SELECT c.*,
-                       COALESCE((
-                           SELECT SUM(valor) FROM transacoes t
-                           WHERE (t.meio_pagamento = CONCAT('Crédito (', c.nome, ')') OR (LOWER(c.nome) = 'inter' AND t.meio_pagamento LIKE 'Crédito%%'))
-                             AND t.tipo = 'SAIDA'
-                             AND MONTH(t.data_transacao) = %s
-                             AND YEAR(t.data_transacao) = %s
-                       ), 0) AS fatura_atual,
-                       COALESCE((
-                           SELECT SUM(valor) FROM transacoes t
-                           WHERE (t.meio_pagamento = CONCAT('Crédito (', c.nome, ')') OR (LOWER(c.nome) = 'inter' AND t.meio_pagamento LIKE 'Crédito%%'))
-                             AND t.tipo = 'SAIDA'
-                             AND (YEAR(t.data_transacao) > %s OR (YEAR(t.data_transacao) = %s AND MONTH(t.data_transacao) > %s))
-                       ), 0) AS parcelas_futuras
-                FROM cartoes c
-                ORDER BY c.nome ASC
-            """
-            cursor.execute(sql, (mes_atual, ano_atual, ano_atual, ano_atual, mes_atual))
+            cursor.execute("SELECT * FROM cartoes ORDER BY nome ASC")
             cartoes = cursor.fetchall()
+            
+            hoje = datetime.now().date()
+
+            for c in cartoes:
+                nome_cartao = c['nome']
+                dia_fechamento = c.get('dia_fechamento') or 25
+
+                # Define as datas de corte baseadas no dia de fechamento (24)
+                try:
+                    data_fechamento_mes_atual = date(hoje.year, hoje.month, dia_fechamento)
+                except ValueError:
+                    data_fechamento_mes_atual = date(hoje.year, hoje.month, 28)
+
+                if hoje > data_fechamento_mes_atual:
+                    # Ex: se hoje é dia 25/11, o ciclo atual fecha em 24/12
+                    # e abriu em 25/11
+                    proximo_mes = hoje + relativedelta(months=1)
+                    data_fechamento_ciclo = date(proximo_mes.year, proximo_mes.month, dia_fechamento)
+                    data_inicio_ciclo = data_fechamento_mes_atual + relativedelta(days=1)
+                else:
+                    # Ex: se hoje é dia 03/11, o ciclo atual fecha em 24/11
+                    # e abriu no dia 25/10 (24/10 + 1 dia)
+                    mes_passado = hoje - relativedelta(months=1)
+                    data_inicio_ciclo = date(mes_passado.year, mes_passado.month, dia_fechamento) + relativedelta(days=1)
+                    data_fechamento_ciclo = data_fechamento_mes_atual
+
+                meio_pag = f"Crédito ({nome_cartao})"
+
+                # Fatura Atual: Compras entre 25 do mês passado e 24 do mês atual
+                sql_fatura_atual = """
+                    SELECT COALESCE(SUM(valor), 0) AS total 
+                    FROM transacoes 
+                    WHERE (meio_pagamento = %s OR (LOWER(%s) = 'inter' AND meio_pagamento LIKE 'Crédito%%'))
+                      AND tipo = 'SAIDA'
+                      AND data_transacao >= %s 
+                      AND data_transacao <= %s
+                """
+                cursor.execute(sql_fatura_atual, (meio_pag, nome_cartao, data_inicio_ciclo, data_fechamento_ciclo))
+                res_atual = cursor.fetchone()
+                c['fatura_atual'] = float(res_atual['total']) if res_atual else 0.0
+
+                # Compras Futuras: Compras após o dia 24 do mês atual
+                sql_futuras = """
+                    SELECT COALESCE(SUM(valor), 0) AS total 
+                    FROM transacoes 
+                    WHERE (meio_pagamento = %s OR (LOWER(%s) = 'inter' AND meio_pagamento LIKE 'Crédito%%'))
+                      AND tipo = 'SAIDA'
+                      AND data_transacao > %s
+                """
+                cursor.execute(sql_futuras, (meio_pag, nome_cartao, data_fechamento_ciclo))
+                res_futuras = cursor.fetchone()
+                c['parcelas_futuras'] = float(res_futuras['total']) if res_futuras else 0.0
+
         connection.close()
         return cartoes
+    except Exception as e:
+        print("ERRO EM LISTAR CARTOES:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 3. ROTA PARA RE-VINCULAR TRANSAÇÕES ANTIGAS AO CARTÃO INTER
+@app.get("/cartoes/corrigir-faturas-existentes")
+def corrigir_faturas_existentes():
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            # Ajusta dia do fechamento para 24
+            cursor.execute("UPDATE cartoes SET dia_fechamento = 25 WHERE LOWER(nome) = 'inter'")
+            
+            # Vincula todos os lançamentos de crédito anteriores ao Inter
+            sql = """
+                UPDATE transacoes 
+                SET meio_pagamento = 'Crédito (Inter)' 
+                WHERE tipo = 'SAIDA' 
+                  AND (meio_pagamento LIKE 'Crédito%%' OR meio_pagamento = 'CREDITO')
+            """
+            cursor.execute(sql)
+            afetados = cursor.rowcount
+            connection.commit()
+        connection.close()
+        return {"mensagem": f"{afetados} lançamentos foram vinculados ao cartão Inter com fechamento no dia 25!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
