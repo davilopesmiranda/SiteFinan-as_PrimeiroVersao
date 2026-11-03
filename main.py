@@ -146,7 +146,7 @@ def criar_transacao(transacao: TransacaoSchema):
                     desc_parcela,
                     valor_parcela,
                     transacao.tipo,
-                    transacao.meio_pagamento,
+                    transacao.meio_pagamento, # Usa exatamente o cartão escolhido no dropdown
                     data_parcela.strftime('%Y-%m-%d')
                 ))
             
@@ -485,47 +485,40 @@ def criar_tabela_cartoes():
     except Exception as e:
         print("Aviso ao verificar tabela cartoes:", e)
 
-import csv
-import io
-import re
-from datetime import datetime, date
-from dateutil.relativedelta import relativedelta
-from fastapi import UploadFile, File, Form, HTTPException
+
 
 # 1. IMPORTAÇÃO DO CSV: ATRIBUI TUDO AUTOMATICAMENTE AO CARTÃO INTER
+# 2. IMPORTAR CSV (FORÇA AUTOMATICAMENTE O CARTÃO "INTER")
 @app.post("/cartoes/importar-csv")
 async def importar_csv_cartao(
-    cartao_nome: str = Form(None), # Opcional, pois força 'Inter'
+    cartao_nome: str = Form(None),
     arquivo: UploadFile = File(...)
 ):
     try:
         conteudo = await arquivo.read()
         try:
-            texto = conteudo.decode('utf-8-sig') # Trata BOM do UTF-8
+            texto = conteudo.decode('utf-8-sig')
         except UnicodeDecodeError:
             texto = conteudo.decode('latin-1')
 
         buffer = io.StringIO(texto)
         leitor_csv = csv.reader(buffer, delimiter=',')
-        cabecalho = next(leitor_csv, None)  # Pula o cabeçalho
+        cabecalho = next(leitor_csv, None)
 
         connection = get_db_connection()
         total_importados = 0
         
-        # FORÇA TODOS OS LANÇAMENTOS DO CSV PARA O CARTÃO "INTER"
         NOME_CARTAO_FIXO = "Inter"
         meio_pagamento_fixo = f"Crédito ({NOME_CARTAO_FIXO})"
 
         with connection.cursor() as cursor:
-            # Garante que o cartão 'Inter' exista no banco com fechamento no dia 24
             cursor.execute("SELECT id FROM cartoes WHERE LOWER(nome) = 'inter'")
             cartao = cursor.fetchone()
             if not cartao:
                 cursor.execute(
-                    "INSERT INTO cartoes (nome, limite, dia_vencimento, dia_fechamento) VALUES ('Inter', 2850.00, 18, 25)"
+                    "INSERT INTO cartoes (nome, limite, dia_vencimento, dia_fechamento) VALUES ('Inter', 5000.00, 1, 25)"
                 )
             else:
-                # Atualiza o dia do fechamento para 24
                 cursor.execute("UPDATE cartoes SET dia_fechamento = 25 WHERE id = %s", (cartao['id'],))
 
             sql_insert = """
@@ -542,18 +535,15 @@ async def importar_csv_cartao(
                 tipo_item = linha[3].strip()
                 raw_valor = linha[4].strip()
 
-                # Ignora pagamentos de fatura ou estornos
                 if "pagamento" in tipo_item.lower() or "pagamento" in desc_item.lower():
                     continue
 
-                # Trata o valor (converte R$, vírgulas e pontos)
                 valor_limpo = re.sub(r'[^\d,-]', '', raw_valor).replace(',', '.')
                 try:
                     valor_item = float(valor_limpo)
                 except ValueError:
                     continue
 
-                # Formata a data (DD/MM/YYYY para YYYY-MM-DD)
                 try:
                     data_formatada = datetime.strptime(raw_data, '%d/%m/%Y').strftime('%Y-%m-%d')
                 except ValueError:
