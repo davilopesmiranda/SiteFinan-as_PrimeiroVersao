@@ -1367,19 +1367,36 @@ async function carregarCartoes() {
         const grid = document.getElementById('gridCartoes');
         const cardTotalLimite = document.getElementById('cardTotalLimiteCartoes');
         const cardQtd = document.getElementById('cardQtdCartoes');
+        
+        // Seletores de cartão (Lançamento Rápido e Importação CSV)
         const selectLancamento = document.getElementById('selectCartao');
+        const selectImportar = document.getElementById('selectCartaoImportar');
 
-        let totalLimite = 0;
-
+        // Preenche os selects se os elementos existirem na página
         if (selectLancamento) {
             selectLancamento.innerHTML = '<option value="">Selecione o cartão...</option>';
-            cartoes.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.nome;
-            opt.textContent = `${c.nome} (Vence dia ${c.dia_vencimento})`;
-            selectLancamento.appendChild(opt);
-});
         }
+        if (selectImportar) {
+            selectImportar.innerHTML = '<option value="">Selecione o cartão...</option>';
+        }
+
+        cartoes.forEach(c => {
+            // Opção para o form de Lançamento Manual
+            if (selectLancamento) {
+                const opt1 = document.createElement('option');
+                opt1.value = c.nome;
+                opt1.textContent = `${c.nome} (Vence dia ${c.dia_vencimento})`;
+                selectLancamento.appendChild(opt1);
+            }
+
+            // Opção para o form de Importar CSV
+            if (selectImportar) {
+                const opt2 = document.createElement('option');
+                opt2.value = c.nome;
+                opt2.textContent = `${c.nome}`;
+                selectImportar.appendChild(opt2);
+            }
+        });
 
         if (cardQtd) cardQtd.innerText = cartoes.length;
 
@@ -1391,6 +1408,8 @@ async function carregarCartoes() {
             if (cardTotalLimite) cardTotalLimite.innerText = 'R$ 0,00';
             return;
         }
+
+        let totalLimite = 0;
 
         cartoes.forEach(c => {
             const limite = parseFloat(c.limite) || 0.0;
