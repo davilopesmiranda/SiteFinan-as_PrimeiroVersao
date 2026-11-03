@@ -34,28 +34,66 @@ def get_db_connection():
         port=int(os.getenv('DB_PORT', 3306)),
         cursorclass=pymysql.cursors.DictCursor
     )
+@app.get("/cartoes/corrigir-faturas-existentes")
+def corrigir_faturas_existentes():
+    """
+    Atualiza todos os lançamentos de cartão passados para pertencerem ao cartão 'Inter'
+    """
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            # 1. Garante que o cartão Inter existe
+            cursor.execute("SELECT id FROM cartoes WHERE LOWER(nome) = 'inter'")
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO cartoes (nome, limite, dia_vencimento, dia_fechamento) VALUES ('Inter', 5000.00, 10, 3)")
 
+            # 2. Atualiza os lançamentos antigos para 'Crédito (Inter)'
+            sql = """
+                UPDATE transacoes 
+                SET meio_pagamento = 'Crédito (Inter)' 
+                WHERE meio_pagamento LIKE 'Crédito%%' 
+                   OR meio_pagamento = 'CREDITO'
+            """
+            cursor.execute(sql)
+            afetados = cursor.rowcount
+            connection.commit()
+        connection.close()
+        return {"mensagem": f"{afetados} lançamentos foram vinculados com sucesso ao cartão Inter!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @app.post("/cartoes/importar-csv")
 async def importar_csv_cartao(
-    cartao_nome: str = Form(...),
+    cartao_nome: Optional[str] = Form(None), # Torna opcional, pois vai fixar 'Inter'
     arquivo: UploadFile = File(...)
 ):
     try:
         conteudo = await arquivo.read()
         try:
-            texto = conteudo.decode('utf-8-sig') # Remove UTF-8 BOM automático
+            texto = conteudo.decode('utf-8-sig') # Trata BOM do UTF-8
         except UnicodeDecodeError:
             texto = conteudo.decode('latin-1')
 
         buffer = io.StringIO(texto)
         leitor_csv = csv.reader(buffer, delimiter=',')
-        cabecalho = next(leitor_csv, None)  # Pula o cabeçalho: Data, Lançamento, Categoria, Tipo, Valor
+        cabecalho = next(leitor_csv, None)  # Pula o cabeçalho
 
         connection = get_db_connection()
         total_importados = 0
         
+        # FIXO: Sempre vincula ao cartão chamado 'Inter'
+        NOME_CARTAO_FIXO = "Inter"
+        meio_pagamento_fixo = f"Crédito ({NOME_CARTAO_FIXO})"
+
         with connection.cursor() as cursor:
-            sql = """
+            # 1. Garante que o cartão 'Inter' exista no banco de dados
+            cursor.execute("SELECT id FROM cartoes WHERE LOWER(nome) = 'inter'")
+            cartao_existe = cursor.fetchone()
+            if not cartao_existe:
+                cursor.execute(
+                    "INSERT INTO cartoes (nome, limite, dia_vencimento, dia_fechamento) VALUES ('Inter', 5000.00, 10, 3)"
+                )
+
+            sql_insert = """
                 INSERT INTO transacoes (descricao, valor, tipo, meio_pagamento, data_transacao)
                 VALUES (%s, %s, 'SAIDA', %s, %s)
             """
@@ -69,32 +107,31 @@ async def importar_csv_cartao(
                 tipo_item = linha[3].strip()
                 raw_valor = linha[4].strip()
 
-                # Ignora pagamentos de fatura ou estornos em crédito
+                # Ignora pagamentos de fatura ou estornos
                 if "pagamento" in tipo_item.lower() or "pagamento" in desc_item.lower():
                     continue
 
-                # Trata o valor: Remove "R$", espaços, pontos de milhar e converte vírgula decimal
+                # Trata o valor (converte R$, vírgulas e pontos)
                 valor_limpo = re.sub(r'[^\d,-]', '', raw_valor).replace(',', '.')
                 try:
                     valor_item = float(valor_limpo)
                 except ValueError:
                     continue
 
-                # Formata a data de DD/MM/YYYY para YYYY-MM-DD
+                # Formata a data (DD/MM/YYYY para YYYY-MM-DD)
                 try:
                     data_formatada = datetime.strptime(raw_data, '%d/%m/%Y').strftime('%Y-%m-%d')
                 except ValueError:
                     data_formatada = datetime.now().strftime('%Y-%m-%d')
 
                 if valor_item > 0:
-                    meio_pagamento = f"Crédito ({cartao_nome.strip()})"
-                    cursor.execute(sql, (desc_item, valor_item, meio_pagamento, data_formatada))
+                    cursor.execute(sql_insert, (desc_item, valor_item, meio_pagamento_fixo, data_formatada))
                     total_importados += 1
 
             connection.commit()
         connection.close()
         
-        return {"mensagem": f"{total_importados} lançamentos importados com sucesso para o cartão {cartao_nome}!"}
+        return {"mensagem": f"{total_importados} lançamentos importados com sucesso para o cartão Inter!"}
     
     except Exception as e:
         print("ERRO AO IMPORTAR CSV:", str(e))
@@ -535,14 +572,14 @@ def listar_cartoes():
                 SELECT c.*,
                        COALESCE((
                            SELECT SUM(valor) FROM transacoes t
-                           WHERE t.meio_pagamento = CONCAT('Crédito (', c.nome, ')')
+                           WHERE (t.meio_pagamento = CONCAT('Crédito (', c.nome, ')') OR (LOWER(c.nome) = 'inter' AND t.meio_pagamento LIKE 'Crédito%%'))
                              AND t.tipo = 'SAIDA'
                              AND MONTH(t.data_transacao) = %s
                              AND YEAR(t.data_transacao) = %s
                        ), 0) AS fatura_atual,
                        COALESCE((
                            SELECT SUM(valor) FROM transacoes t
-                           WHERE t.meio_pagamento = CONCAT('Crédito (', c.nome, ')')
+                           WHERE (t.meio_pagamento = CONCAT('Crédito (', c.nome, ')') OR (LOWER(c.nome) = 'inter' AND t.meio_pagamento LIKE 'Crédito%%'))
                              AND t.tipo = 'SAIDA'
                              AND (YEAR(t.data_transacao) > %s OR (YEAR(t.data_transacao) = %s AND MONTH(t.data_transacao) > %s))
                        ), 0) AS parcelas_futuras
