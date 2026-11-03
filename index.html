@@ -175,24 +175,39 @@
             </div>
         </div>
 
-        <!-- MODO IMPORTAÇÃO DE FATURA (INICIA OCULTO) -->
-        <div id="containerImportarFatura" style="display: none; animation: fadeIn 0.25s ease;">
-            <div class="form-group">
-                <label>Selecione o Cartão de Crédito</label>
-                <select class="form-control" id="selectCartaoImportar">
-                    <option value="">Selecione o cartão...</option>
-                </select>
-            </div>
+        <!-- MODO IMPORTAÇÃO DE FATURA (EXCLUSIVO) -->
+<div id="containerImportarFatura" style="display: none; animation: fadeIn 0.25s ease;">
+    
+    <!-- 1. Seleção do Cartão -->
+    <div class="form-group">
+        <label><i class="fa-solid fa-credit-card"></i> Qual cartão pertence esta fatura?</label>
+        <select class="form-control" id="selectCartaoImportar">
+            <option value="">Selecione o cartão...</option>
+        </select>
+    </div>
 
-            <div class="form-group">
-                <label>Arquivo CSV da Fatura (ex: Banco Inter)</label>
-                <input type="file" id="inputFileCSV" accept=".csv" class="form-control">
+    <!-- 2. Área Estilizada para Upload do CSV -->
+    <div class="form-group">
+        <label><i class="fa-solid fa-file-csv"></i> Arquivo da Fatura (.csv)</label>
+        
+        <div class="custom-file-upload" id="dropAreaCSV">
+            <input type="file" id="inputFileCSV" accept=".csv" onchange="atualizarNomeArquivo(this)">
+            <div class="upload-icon">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
             </div>
-
-            <button class="btn-submit" onclick="enviarCSVFatura()">
-                <i class="fa-solid fa-upload"></i> Processar e Importar Fatura
-            </button>
+            <div class="upload-text" id="labelFileCSV">
+                <strong>Clique para escolher o arquivo CSV</strong>
+                <span>ou arraste e solte o arquivo aqui</span>
+            </div>
         </div>
+    </div>
+
+    <!-- 3. Botão de Envio -->
+    <button class="btn-submit" onclick="enviarCSVFatura()" style="margin-top: 1.5rem;">
+        <i class="fa-solid fa-file-import"></i> Importar Lançamentos da Fatura
+    </button>
+
+</div>
 
         <!-- TABELA DE ÚLTIMOS LANÇAMENTOS -->
         <div style="margin-top: 2.5rem; width: 100%;">

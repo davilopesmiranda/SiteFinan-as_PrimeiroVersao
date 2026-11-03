@@ -211,6 +211,24 @@ async function enviarCSVFatura() {
         alert("Erro ao conectar com o servidor.");
     }
 }
+// Exibe visualmente o nome do arquivo CSV selecionado no uploader customizado
+function atualizarNomeArquivo(input) {
+    const label = document.getElementById('labelFileCSV');
+    if (!label) return;
+
+    if (input.files && input.files.length > 0) {
+        const nomeArquivo = input.files[0].name;
+        label.innerHTML = `
+            <strong style="color: var(--forest-primary);"><i class="fa-solid fa-circle-check"></i> ${nomeArquivo}</strong>
+            <span style="color: var(--text-muted);">Arquivo pronto para importação</span>
+        `;
+    } else {
+        label.innerHTML = `
+            <strong>Clique para escolher o arquivo CSV</strong>
+            <span>ou arraste e solte o arquivo aqui</span>
+        `;
+    }
+}
 
 async function salvarLancamento(event) {
     if (event) event.preventDefault();
