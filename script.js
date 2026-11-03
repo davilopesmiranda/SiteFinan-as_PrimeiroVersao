@@ -1379,26 +1379,6 @@ async function enviarCSVFatura() {
     formData.append('cartao_nome', selectCartao.value);
     formData.append('arquivo', fileInput.files[0]);
 
-    const selectImportar = document.getElementById('selectCartaoImportar');
-
-if (selectLancamento) {
-    selectLancamento.innerHTML = '<option value="">Selecione o cartão...</option>';
-    if (selectImportar) selectImportar.innerHTML = '<option value="">Selecione o cartão...</option>';
-
-    cartoes.forEach(c => {
-        const opt1 = document.createElement('option');
-        opt1.value = c.nome;
-        opt1.textContent = `${c.nome} (Vence dia ${c.dia_vencimento})`;
-        selectLancamento.appendChild(opt1);
-
-        if (selectImportar) {
-            const opt2 = document.createElement('option');
-            opt2.value = c.nome;
-            opt2.textContent = `${c.nome}`;
-            selectImportar.appendChild(opt2);
-        }
-    });
-}
     try {
         const response = await fetch(`${API_URL}/cartoes/importar-csv`, {
             method: 'POST',
@@ -1408,18 +1388,21 @@ if (selectLancamento) {
         if (response.ok) {
             const res = await response.json();
             alert(res.mensagem);
-            fileInput.value = '';
             
-            carregarCartoes();
+            // Limpa o input de arquivo e redefine a legenda visual
+            fileInput.value = '';
+            atualizarNomeArquivo(fileInput);
+            
+            // Recarrega as informações e tabelas
             carregarTransacoes();
             carregarResumoDashboard();
             carregarGraficoEvolucao();
         } else {
             const err = await response.json();
-            alert(`Erro na importação: ${err.detail}`);
+            alert(`Erro na importação: ${err.detail || 'Falha ao processar arquivo'}`);
         }
     } catch (error) {
-        console.error("Erro na requisição:", error);
+        console.error("Erro ao enviar CSV:", error);
         alert("Erro ao conectar com o servidor.");
     }
 }
@@ -1434,11 +1417,13 @@ async function carregarCartoes() {
         const cardTotalLimite = document.getElementById('cardTotalLimiteCartoes');
         const cardQtd = document.getElementById('cardQtdCartoes');
         
-        // Seletores de cartão (Lançamento Rápido e Importação CSV)
+        // 1. CAPTURA OS DOIS SELECTS DE CARTÃO
         const selectLancamento = document.getElementById('selectCartao');
         const selectImportar = document.getElementById('selectCartaoImportar');
 
-        // Preenche os selects se os elementos existirem na página
+        let totalLimite = 0;
+
+        // 2. RESETA AS OPÇÕES DE AMBOS
         if (selectLancamento) {
             selectLancamento.innerHTML = '<option value="">Selecione o cartão...</option>';
         }
@@ -1446,8 +1431,8 @@ async function carregarCartoes() {
             selectImportar.innerHTML = '<option value="">Selecione o cartão...</option>';
         }
 
+        // 3. POPULA OS DOIS SELECTS COM OS CARTÕES DO BANCO
         cartoes.forEach(c => {
-            // Opção para o form de Lançamento Manual
             if (selectLancamento) {
                 const opt1 = document.createElement('option');
                 opt1.value = c.nome;
@@ -1455,7 +1440,6 @@ async function carregarCartoes() {
                 selectLancamento.appendChild(opt1);
             }
 
-            // Opção para o form de Importar CSV
             if (selectImportar) {
                 const opt2 = document.createElement('option');
                 opt2.value = c.nome;
@@ -1474,8 +1458,6 @@ async function carregarCartoes() {
             if (cardTotalLimite) cardTotalLimite.innerText = 'R$ 0,00';
             return;
         }
-
-        let totalLimite = 0;
 
         cartoes.forEach(c => {
             const limite = parseFloat(c.limite) || 0.0;
