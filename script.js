@@ -168,7 +168,7 @@ function setType(type, btn) {
     }
 }
 
-// 2. Envia a fatura em CSV para o servidor
+// Envia a fatura em CSV para o servidor
 async function enviarCSVFatura() {
     const selectCartao = document.getElementById('selectCartaoImportar');
     const fileInput = document.getElementById('inputFileCSV');
@@ -196,12 +196,16 @@ async function enviarCSVFatura() {
         if (response.ok) {
             const res = await response.json();
             alert(res.mensagem);
-            fileInput.value = '';
             
-            // Recarrega todos os dados
+            // Limpa o input e reseta a legenda do botão de upload
+            fileInput.value = '';
+            atualizarNomeArquivo(fileInput);
+            
+            // Recarrega todos os dados do dashboard e transações
             carregarTransacoes();
             carregarResumoDashboard();
             carregarGraficoEvolucao();
+            carregarCartoes();
         } else {
             const err = await response.json();
             alert(`Erro na importação: ${err.detail || 'Falha ao processar arquivo'}`);
@@ -211,6 +215,7 @@ async function enviarCSVFatura() {
         alert("Erro ao conectar com o servidor.");
     }
 }
+
 // Exibe visualmente o nome do arquivo CSV selecionado no uploader customizado
 function atualizarNomeArquivo(input) {
     const label = document.getElementById('labelFileCSV');
@@ -1539,9 +1544,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Garante o estado correto do campo de cartão ao iniciar
     const selectMeio = document.getElementById('selectMeio');
     if (selectMeio) toggleCartoes(selectMeio.value);
-
-    const btnSubmit = document.querySelector('#tab-lancamento .btn-submit');
-    if (btnSubmit) {
-        btnSubmit.onclick = salvarLancamento;
-    }
 });
