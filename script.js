@@ -1,6 +1,11 @@
 const API_URL = "https://financas-api-2lm0.onrender.com";
 let currentTab = 'tab-financas';
 
+// ESTADO GLOBAL DOS LANÇAMENTOS E FILTROS
+let todasTransacoesCache = [];
+let transacoesFiltradasCache = [];
+let paginaAtualModal = 1;
+
 // ==========================================
 // 0. CONTROLE DE TEMA (CLARO / ESCURO)
 // ==========================================
@@ -97,12 +102,11 @@ function switchTab(tabId, element) {
     if (tabId === 'tab-investimentos') carregarInvestimentos();
     if (tabId === 'tab-metas') carregarMetas();
     if (tabId === 'tab-lancamento') { 
-    carregarTransacoes(); 
-    carregarCartoes(); 
-    // Garante que verifica se o select está em "CREDITO" ao abrir a aba
-    const selectMeio = document.getElementById('selectMeio');
-    if (selectMeio) toggleCartoes(selectMeio.value);
-}
+        carregarTransacoes(); 
+        carregarCartoes(); 
+        const selectMeio = document.getElementById('selectMeio');
+        if (selectMeio) toggleCartoes(selectMeio.value);
+    }
 }
 
 function executarAcaoHeader() {
@@ -123,8 +127,7 @@ function fecharModais() {
 }
 
 // 2. Transações
-// Alteração na função setType para esconder Meio de Pagamento e Cartões em Entradas
-// 1. Alterna entre Saída, Entrada e Importar Fatura
+
 function setType(type, btn) {
     document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active', 'saida', 'entrada', 'fatura'));
     btn.classList.add('active', type);
@@ -133,33 +136,25 @@ function setType(type, btn) {
     const containerFatura = document.getElementById('containerImportarFatura');
 
     if (type === 'fatura') {
-        // Exibe tela de importação e esconde lançamento manual
         if (containerManual) containerManual.style.display = 'none';
         if (containerFatura) containerFatura.style.display = 'block';
-        carregarCartoes(); // Garante que a lista de cartões esteja carregada
+        carregarCartoes();
     } else {
-        // Exibe lançamento manual e esconde importação
         if (containerManual) containerManual.style.display = 'block';
         if (containerFatura) containerFatura.style.display = 'none';
 
         const groupMeio = document.getElementById('groupMeioPagamento');
         const groupCartoes = document.getElementById('groupCartoes');
         const groupParcelas = document.getElementById('groupParcelas');
-        const groupCatSaida = document.getElementById('groupCategoriaSaida');
-        const groupCatEntrada = document.getElementById('groupCategoriaEntrada');
         const linhaForm = document.getElementById('linhaFormularioDuplo');
 
         if (type === 'entrada') {
             if (groupMeio) groupMeio.style.display = 'none';
             if (groupCartoes) groupCartoes.style.display = 'none';
             if (groupParcelas) groupParcelas.style.display = 'none';
-            if (groupCatSaida) groupCatSaida.style.display = 'none';
-            if (groupCatEntrada) groupCatEntrada.style.display = 'block';
             if (linhaForm) linhaForm.style.gridTemplateColumns = '1fr';
         } else {
             if (groupMeio) groupMeio.style.display = 'block';
-            if (groupCatSaida) groupCatSaida.style.display = 'block';
-            if (groupCatEntrada) groupCatEntrada.style.display = 'none';
             if (linhaForm) linhaForm.style.gridTemplateColumns = '1fr 1fr';
 
             const selectMeio = document.getElementById('selectMeio');
@@ -168,7 +163,6 @@ function setType(type, btn) {
     }
 }
 
-// Envia a fatura em CSV para o servidor
 async function enviarCSVFatura() {
     const selectCartao = document.getElementById('selectCartaoImportar');
     const fileInput = document.getElementById('inputFileCSV');
@@ -197,11 +191,9 @@ async function enviarCSVFatura() {
             const res = await response.json();
             alert(res.mensagem);
             
-            // Limpa o input e reseta a legenda do botão de upload
             fileInput.value = '';
             atualizarNomeArquivo(fileInput);
             
-            // Recarrega todos os dados do dashboard e transações
             carregarTransacoes();
             carregarResumoDashboard();
             carregarGraficoEvolucao();
@@ -216,7 +208,6 @@ async function enviarCSVFatura() {
     }
 }
 
-// Exibe visualmente o nome do arquivo CSV selecionado no uploader customizado
 function atualizarNomeArquivo(input) {
     const label = document.getElementById('labelFileCSV');
     if (!label) return;
@@ -243,10 +234,6 @@ async function salvarLancamento(event) {
     const selectMeio = document.getElementById('selectMeio');
     const selectCartao = document.getElementById('selectCartao');
     const selectParcelas = document.getElementById('selectParcelas');
-    
-    const selectCatSaida = document.getElementById('selectCategoriaSaida');
-    const selectCatEntrada = document.getElementById('selectCategoriaEntrada');
-    
     const btnSaida = document.querySelector('.type-btn.saida');
 
     if (!inputValor || !inputDescricao) {
@@ -256,22 +243,16 @@ async function salvarLancamento(event) {
 
     const valor = parseFloat(inputValor.value);
     const descricao = inputDescricao.value.trim();
+    const meioSelecionado = selectMeio ? selectMeio.value : 'PIX';
     const tipo = btnSaida && btnSaida.classList.contains('active') ? 'SAIDA' : 'ENTRADA';
-    const categoria = tipo === 'SAIDA' 
-        ? (selectCatSaida ? selectCatSaida.value : 'Geral')
-        : (selectCatEntrada ? selectCatEntrada.value : 'Receita');
 
     if (isNaN(valor) || valor <= 0 || !descricao) {
         alert("Preencha um valor válido e a descrição!");
         return;
     }
 
-    let meioPagamentoFinal = tipo === 'ENTRADA' 
-        ? `Receita (${categoria})` 
-        : (selectMeio ? selectMeio.value : 'PIX');
-
-    // Se for Cartão de Crédito manual, valida qual cartão foi escolhido
-    if (tipo === 'SAIDA' && meioPagamentoFinal === 'CREDITO') {
+    let meioPagamentoFinal = tipo === 'ENTRADA' ? 'ENTRADA' : meioSelecionado;
+    if (tipo === 'SAIDA' && meioSelecionado === 'CREDITO') {
         const cartaoEscolhido = selectCartao ? selectCartao.value.trim() : '';
         if (cartaoEscolhido) {
             meioPagamentoFinal = `Crédito (${cartaoEscolhido})`;
@@ -281,7 +262,7 @@ async function salvarLancamento(event) {
         }
     }
 
-    const parcelas = (tipo === 'SAIDA' && selectParcelas && selectMeio.value === 'CREDITO') 
+    const parcelas = (tipo === 'SAIDA' && selectParcelas && meioSelecionado === 'CREDITO') 
         ? parseInt(selectParcelas.value) 
         : 1;
 
@@ -307,7 +288,6 @@ async function salvarLancamento(event) {
             carregarTransacoes();
             carregarResumoDashboard();
             carregarGraficoEvolucao();
-            carregarCartoes();
         } else {
             const erroData = await response.json();
             alert(`Erro ao salvar: ${erroData.detail || 'Falha no servidor'}`);
@@ -317,6 +297,7 @@ async function salvarLancamento(event) {
         alert("Erro ao conectar com o servidor.");
     }
 }
+
 function addValor(valor) {
     const input = document.getElementById('inputValor');
     if (!input) return;
@@ -336,12 +317,7 @@ function toggleCartoes(meio) {
     }
 }
 
-// VARIABLES DE ESTADO DOS LANÇAMENTOS E FILTROS
-let todasTransacoesCache = [];
-let transacoesFiltradasCache = [];
-let paginaAtualModal = 1;
-
-// 1. CARREGAR TRANSAÇÕES DO BACKEND E POPULAR TABELAS E FILTROS
+// CARREGAR TRANSAÇÕES DO BACKEND
 async function carregarTransacoes() {
     try {
         const response = await fetch(`${API_URL}/transacoes`);
@@ -349,13 +325,9 @@ async function carregarTransacoes() {
 
         todasTransacoesCache = await response.json();
         
-        // Renderiza apenas os 10 últimos na tabela principal da aba
         renderizarTabelaResumida();
-
-        // Popula as opções dos seletores de filtro do modal dinamicamente
         popularOpcoesFiltro();
 
-        // Se o modal estiver aberto, atualiza os dados filtrados
         const modal = document.getElementById('modalTodosLancamentos');
         if (modal && modal.classList.contains('active')) {
             filtrarETabelaModal(paginaAtualModal);
@@ -365,7 +337,6 @@ async function carregarTransacoes() {
     }
 }
 
-// Renderiza a tabela resumida (últimos 10 lançamentos na aba Lançamentos)
 function renderizarTabelaResumida() {
     const tbody = document.getElementById('tbodyLancamentos');
     if (!tbody) return;
@@ -374,7 +345,7 @@ function renderizarTabelaResumida() {
     const ultimos10 = todasTransacoesCache.slice(0, 10);
 
     if (ultimos10.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Nenhum lançamento registrado ainda.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Nenhum lançamento registrado ainda.</td></tr>';
         return;
     }
 
@@ -384,12 +355,10 @@ function renderizarTabelaResumida() {
         const sinal = t.tipo === 'SAIDA' ? '-' : '+';
         const descEscapada = t.descricao.replace(/'/g, "\\'");
         const meio = t.meio_pagamento || 'PIX';
-        const categoria = t.categoria || 'Geral';
 
         tr.innerHTML = `
             <td>${t.descricao}</td>
             <td>${meio}</td>
-            <td>${categoria}</td>
             <td style="color: ${corValor}; font-weight: 600;">${sinal} R$ ${parseFloat(t.valor).toFixed(2)}</td>
             <td>
                 <i class="fa-solid fa-trash-can" style="color: var(--danger); cursor: pointer;" 
@@ -401,22 +370,15 @@ function renderizarTabelaResumida() {
     });
 }
 
-// Popula os dropdowns de filtro de Meio de Pagamento e Categoria dinamicamente
 function popularOpcoesFiltro() {
     const selectMeio = document.getElementById('filtroMeioPagamento');
-    const selectCat = document.getElementById('filtroCategoria');
-
-    if (!selectMeio || !selectCat) return;
+    if (!selectMeio) return;
 
     const meiosUnicos = new Set();
-    const categoriasUnicas = new Set();
-
     todasTransacoesCache.forEach(t => {
         if (t.meio_pagamento) meiosUnicos.add(t.meio_pagamento);
-        if (t.categoria) categoriasUnicas.add(t.categoria);
     });
 
-    // Atualiza Meios
     selectMeio.innerHTML = '<option value="TODOS">Todos os meios</option>';
     Array.from(meiosUnicos).sort().forEach(m => {
         const opt = document.createElement('option');
@@ -424,18 +386,8 @@ function popularOpcoesFiltro() {
         opt.textContent = m;
         selectMeio.appendChild(opt);
     });
-
-    // Atualiza Categorias
-    selectCat.innerHTML = '<option value="TODOS">Todas as categorias</option>';
-    Array.from(categoriasUnicas).sort().forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
-        selectCat.appendChild(opt);
-    });
 }
 
-// 2. ABRIR MODAL HISTÓRICO COMPLETO
 function abrirModalTodosLancamentos() {
     const modal = document.getElementById('modalTodosLancamentos');
     if (!modal) return;
@@ -444,27 +396,23 @@ function abrirModalTodosLancamentos() {
     filtrarETabelaModal(1);
 }
 
-// 3. APLICA OS FILTROS DE BUSCA, TIPO, MEIO E CATEGORIA
 function filtrarETabelaModal(pagina = 1) {
     const busca = (document.getElementById('filtroBuscaDescricao')?.value || '').toLowerCase().trim();
     const tipo = document.getElementById('filtroTipo')?.value || 'TODOS';
     const meio = document.getElementById('filtroMeioPagamento')?.value || 'TODOS';
-    const categoria = document.getElementById('filtroCategoria')?.value || 'TODOS';
 
     transacoesFiltradasCache = todasTransacoesCache.filter(t => {
         const descMatch = (t.descricao || '').toLowerCase().includes(busca);
         const tipoMatch = tipo === 'TODOS' || t.tipo === tipo;
         const meioMatch = meio === 'TODOS' || t.meio_pagamento === meio;
-        const catMatch = categoria === 'TODOS' || (t.categoria || 'Geral') === categoria;
 
-        return descMatch && tipoMatch && meioMatch && catMatch;
+        return descMatch && tipoMatch && meioMatch;
     });
 
     paginaAtualModal = pagina;
     renderizarPaginaModal();
 }
 
-// 4. RENDERIZA OS ITENS DA PÁGINA SELECIONADA
 function renderizarPaginaModal() {
     const tbody = document.getElementById('tbodyTodosLancamentos');
     const labelTotal = document.getElementById('labelTotalFiltro');
@@ -494,7 +442,7 @@ function renderizarPaginaModal() {
     tbody.innerHTML = '';
 
     if (paginaItens.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 1.5rem;">Nenhum lançamento encontrado com esses filtros.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 1.5rem;">Nenhum lançamento encontrado com esses filtros.</td></tr>';
         return;
     }
 
@@ -514,7 +462,6 @@ function renderizarPaginaModal() {
             <td>${dataFmt}</td>
             <td><strong>${t.descricao}</strong></td>
             <td>${t.meio_pagamento || 'PIX'}</td>
-            <td>${t.categoria || 'Geral'}</td>
             <td style="color: ${corValor}; font-weight: 600;">${sinal} R$ ${parseFloat(t.valor).toFixed(2)}</td>
             <td style="text-align: center;">
                 <i class="fa-solid fa-trash-can" style="color: var(--danger); cursor: pointer;" 
@@ -526,7 +473,6 @@ function renderizarPaginaModal() {
     });
 }
 
-// NAVEGAÇÃO DE PÁGINAS DO MODAL
 function mudarPaginaModal(delta) {
     paginaAtualModal += delta;
     renderizarPaginaModal();
@@ -554,77 +500,6 @@ async function apagarTransacao(id, descricao) {
         alert("Erro ao conectar com o servidor.");
     }
 }
-
-async function salvarLancamento(event) {
-    if (event) event.preventDefault();
-
-    const inputValor = document.getElementById('inputValor');
-    const inputDescricao = document.getElementById('inputDescricao');
-    const selectMeio = document.getElementById('selectMeio');
-    const selectCartao = document.getElementById('selectCartao');
-    const selectParcelas = document.getElementById('selectParcelas');
-    const btnSaida = document.querySelector('.type-btn.saida');
-
-    if (!inputValor || !inputDescricao) {
-        alert("Erro no formulário: campos não encontrados.");
-        return;
-    }
-
-    const valor = parseFloat(inputValor.value);
-    const descricao = inputDescricao.value.trim();
-    const meioSelecionado = selectMeio ? selectMeio.value : 'PIX';
-    const tipo = btnSaida && btnSaida.classList.contains('active') ? 'SAIDA' : 'ENTRADA';
-
-    if (isNaN(valor) || valor <= 0 || !descricao) {
-        alert("Preencha um valor válido e a descrição!");
-        return;
-    }
-
-    let meioPagamentoFinal = meioSelecionado;
-    if (meioSelecionado === 'CREDITO') {
-        const cartaoEscolhido = selectCartao ? selectCartao.value.trim() : '';
-        if (cartaoEscolhido) {
-            meioPagamentoFinal = `Crédito (${cartaoEscolhido})`;
-        } else {
-            alert("Por favor, selecione qual cartão de crédito foi utilizado!");
-            return;
-        }
-    }
-
-    const parcelas = selectParcelas && meioSelecionado === 'CREDITO' ? parseInt(selectParcelas.value) : 1;
-
-    try {
-        const response = await fetch(`${API_URL}/transacoes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                descricao: descricao,
-                valor: valor,
-                tipo: tipo,
-                meio_pagamento: meioPagamentoFinal,
-                parcelas: parcelas
-            })
-        });
-
-        if (response.ok) {
-            alert("Lançamento salvo com sucesso!");
-            inputValor.value = '';
-            inputDescricao.value = '';
-            if (selectCartao) selectCartao.value = '';
-            
-            carregarTransacoes();
-            carregarResumoDashboard();
-            carregarGraficoEvolucao();
-        } else {
-            const erroData = await response.json();
-            alert(`Erro ao salvar: ${erroData.detail || 'Falha no servidor'}`);
-        }
-    } catch (error) {
-        console.error("Erro na requisição:", error);
-        alert("Erro ao conectar com o servidor.");
-    }
-}
-
 
 // 3. Gráfico de Evolução Mensal (Barras)
 
@@ -736,11 +611,8 @@ async function carregarGraficoEvolucao() {
     }
 }
 
-
-// 4. Gráfico de Pizza - Alocação por Setor no Dashboard Principal
-
+// 4. Gráfico de Pizza - Carteira por Setor
 let chartSetoresInstance = null;
-
 const coresSetores = [
     '#2d6a4f', '#40916c', '#52b788', '#74c69d', '#95d5b2',
     '#e63946', '#f4a261', '#2a9d8f', '#e76f51', '#457b9d'
@@ -801,7 +673,7 @@ async function carregarGraficoSetores() {
         } else {
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             chartSetoresInstance = new Chart(canvasSetores.getContext('2d'), {
-                type: 'pie', // PIZZA CHEIO
+                type: 'pie',
                 data: {
                     labels: dados.labels,
                     datasets: [{
@@ -834,9 +706,7 @@ async function carregarGraficoSetores() {
     }
 }
 
-
-// 5. Investimentos & Dashboard de Ações (com cores personalizadas)
-
+// 5. Investimentos & Dashboard de Ações
 let chartInvestDashInstance = null;
 let modoDashboardInvest = 'setor';
 let listaAtivosCache = [];
@@ -934,7 +804,7 @@ function renderizarDashboardInvestimentos() {
     } else {
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         chartInvestDashInstance = new Chart(canvas.getContext('2d'), {
-            type: 'pie', // PIZZA CHEIO
+            type: 'pie',
             data: {
                 labels: labels,
                 datasets: [{
@@ -964,27 +834,22 @@ function renderizarDashboardInvestimentos() {
     }
 }
 
-// --- CONTROLE DE ORDENAÇÃO DA TABELA DE INVESTIMENTOS ---
-let colunaOrdenacao = null; // 'quantidade', 'preco_medio' ou 'total'
-let ordemAscendente = true; // true = menor -> maior (▲), false = maior -> menor (▼)
+// CONTROLE DE ORDENAÇÃO DA TABELA DE INVESTIMENTOS
+let colunaOrdenacao = null;
+let ordemAscendente = true;
 
 function ordenarInvestimentos(coluna) {
     if (colunaOrdenacao === coluna) {
-        // Se já está ordenando por essa coluna, inverte o sentido (Asc / Desc)
         ordemAscendente = !ordemAscendente;
     } else {
-        // Nova coluna selecionada, inicia em ordem crescente
         colunaOrdenacao = coluna;
         ordemAscendente = true;
     }
-
-    // Recarrega e renderiza a tabela com a nova ordem aplicada
     carregarInvestimentos();
 }
 
 function atualizarIconesOrdenacao() {
     const colunas = ['quantidade', 'preco_medio', 'total'];
-    
     colunas.forEach(col => {
         const icon = document.getElementById(`sort-icon-${col}`);
         if (!icon) return;
@@ -1008,7 +873,6 @@ async function carregarInvestimentos() {
 
         let ativos = await response.json();
 
-        // 1. Aplica a ordenação se alguma coluna foi selecionada
         if (colunaOrdenacao) {
             ativos.sort((a, b) => {
                 let valA, valB;
@@ -1029,8 +893,6 @@ async function carregarInvestimentos() {
         }
 
         listaAtivosCache = ativos;
-
-        // 2. Atualiza os ícones de setinhas do cabeçalho
         atualizarIconesOrdenacao();
 
         const tbody = document.getElementById('tbodyInvestimentos');
@@ -1211,7 +1073,6 @@ async function salvarAporte() {
         alert("Erro ao salvar aporte.");
     }
 }
-
 
 // 6. Metas
 
@@ -1427,7 +1288,6 @@ async function confirmarProgressoMeta() {
     }
 }
 
-
 // 7. Dashboard Resumo Financas
 
 async function carregarResumoDashboard() {
@@ -1453,7 +1313,6 @@ async function carregarResumoDashboard() {
         console.error("Erro ao carregar resumo do dashboard:", error);
     }
 }
-
 
 // 8. Cartões de Crédito
 
@@ -1520,52 +1379,6 @@ async function apagarCartao(id, nome) {
         alert("Erro ao conectar com o servidor.");
     }
 }
-// Preenche o seletor de cartão no bloco de importação dentro de carregarCartoes()
-async function enviarCSVFatura() {
-    const selectCartao = document.getElementById('selectCartaoImportar');
-    const fileInput = document.getElementById('inputFileCSV');
-
-    if (!selectCartao || !selectCartao.value) {
-        alert("Por favor, selecione qual cartão pertence a essa fatura!");
-        return;
-    }
-
-    if (!fileInput.files || fileInput.files.length === 0) {
-        alert("Selecione o arquivo .csv da sua fatura!");
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('cartao_nome', selectCartao.value);
-    formData.append('arquivo', fileInput.files[0]);
-
-    try {
-        const response = await fetch(`${API_URL}/cartoes/importar-csv`, {
-            method: 'POST',
-            body: formData
-        });
-
-        if (response.ok) {
-            const res = await response.json();
-            alert(res.mensagem);
-            
-            // Limpa o input de arquivo e redefine a legenda visual
-            fileInput.value = '';
-            atualizarNomeArquivo(fileInput);
-            
-            // Recarrega as informações e tabelas
-            carregarTransacoes();
-            carregarResumoDashboard();
-            carregarGraficoEvolucao();
-        } else {
-            const err = await response.json();
-            alert(`Erro na importação: ${err.detail || 'Falha ao processar arquivo'}`);
-        }
-    } catch (error) {
-        console.error("Erro ao enviar CSV:", error);
-        alert("Erro ao conectar com o servidor.");
-    }
-}
 
 async function carregarCartoes() {
     try {
@@ -1577,13 +1390,11 @@ async function carregarCartoes() {
         const cardTotalLimite = document.getElementById('cardTotalLimiteCartoes');
         const cardQtd = document.getElementById('cardQtdCartoes');
         
-        // 1. CAPTURA OS DOIS SELECTS DE CARTÃO
         const selectLancamento = document.getElementById('selectCartao');
         const selectImportar = document.getElementById('selectCartaoImportar');
 
         let totalLimite = 0;
 
-        // 2. RESETA AS OPÇÕES DE AMBOS
         if (selectLancamento) {
             selectLancamento.innerHTML = '<option value="">Selecione o cartão...</option>';
         }
@@ -1591,7 +1402,6 @@ async function carregarCartoes() {
             selectImportar.innerHTML = '<option value="">Selecione o cartão...</option>';
         }
 
-        // 3. POPULA OS DOIS SELECTS COM OS CARTÕES DO BANCO
         cartoes.forEach(c => {
             if (selectLancamento) {
                 const opt1 = document.createElement('option');
@@ -1681,11 +1491,7 @@ async function carregarCartoes() {
     }
 }
 
-
-// --- INICIALIZAÇÃO ---
-
-// --- INICIALIZAÇÃO ---
-
+// INICIALIZAÇÃO
 document.addEventListener('DOMContentLoaded', () => {
     const temaAtual = localStorage.getItem('theme') || 'light';
     aplicarTema(temaAtual);
@@ -1696,7 +1502,6 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarGraficoSetores();
     carregarCartoes();
 
-    // Garante o estado correto do campo de cartão ao iniciar
     const selectMeio = document.getElementById('selectMeio');
     if (selectMeio) toggleCartoes(selectMeio.value);
 });
