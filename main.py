@@ -564,6 +564,7 @@ async def importar_csv_cartao(
 
 
 # 2. ROTA DE LISTAGEM COM CÁLCULO BASEADO NO FECHAMENTO (DIA 24)
+# ROTA DE LISTAGEM COM CÁLCULO ESPECÍFICO POR CARTÃO (BTG, INTER, ETC.)
 @app.get("/cartoes")
 def listar_cartoes():
     criar_tabela_cartoes()
@@ -579,49 +580,45 @@ def listar_cartoes():
                 nome_cartao = c['nome']
                 dia_fechamento = c.get('dia_fechamento') or 25
 
-                # Define as datas de corte baseadas no dia de fechamento (24)
+                # Define a data de corte baseada no dia do fechamento do cartão
                 try:
                     data_fechamento_mes_atual = date(hoje.year, hoje.month, dia_fechamento)
                 except ValueError:
                     data_fechamento_mes_atual = date(hoje.year, hoje.month, 28)
 
                 if hoje > data_fechamento_mes_atual:
-                    # Ex: se hoje é dia 25/11, o ciclo atual fecha em 24/12
-                    # e abriu em 25/11
                     proximo_mes = hoje + relativedelta(months=1)
                     data_fechamento_ciclo = date(proximo_mes.year, proximo_mes.month, dia_fechamento)
                     data_inicio_ciclo = data_fechamento_mes_atual + relativedelta(days=1)
                 else:
-                    # Ex: se hoje é dia 03/11, o ciclo atual fecha em 24/11
-                    # e abriu no dia 25/10 (24/10 + 1 dia)
                     mes_passado = hoje - relativedelta(months=1)
                     data_inicio_ciclo = date(mes_passado.year, mes_passado.month, dia_fechamento) + relativedelta(days=1)
                     data_fechamento_ciclo = data_fechamento_mes_atual
 
                 meio_pag = f"Crédito ({nome_cartao})"
 
-                # Fatura Atual: Compras entre 25 do mês passado e 24 do mês atual
+                # Fatura Atual: Busca APENAS as transações do próprio cartão
                 sql_fatura_atual = """
                     SELECT COALESCE(SUM(valor), 0) AS total 
                     FROM transacoes 
-                    WHERE (meio_pagamento = %s OR (LOWER(%s) = 'inter' AND meio_pagamento LIKE 'Crédito%%'))
+                    WHERE meio_pagamento = %s
                       AND tipo = 'SAIDA'
                       AND data_transacao >= %s 
                       AND data_transacao <= %s
                 """
-                cursor.execute(sql_fatura_atual, (meio_pag, nome_cartao, data_inicio_ciclo, data_fechamento_ciclo))
+                cursor.execute(sql_fatura_atual, (meio_pag, data_inicio_ciclo, data_fechamento_ciclo))
                 res_atual = cursor.fetchone()
                 c['fatura_atual'] = float(res_atual['total']) if res_atual else 0.0
 
-                # Compras Futuras: Compras após o dia 24 do mês atual
+                # Compras Futuras: Busca APENAS as transações do próprio cartão
                 sql_futuras = """
                     SELECT COALESCE(SUM(valor), 0) AS total 
                     FROM transacoes 
-                    WHERE (meio_pagamento = %s OR (LOWER(%s) = 'inter' AND meio_pagamento LIKE 'Crédito%%'))
+                    WHERE meio_pagamento = %s
                       AND tipo = 'SAIDA'
                       AND data_transacao > %s
                 """
-                cursor.execute(sql_futuras, (meio_pag, nome_cartao, data_fechamento_ciclo))
+                cursor.execute(sql_futuras, (meio_pag, data_fechamento_ciclo))
                 res_futuras = cursor.fetchone()
                 c['parcelas_futuras'] = float(res_futuras['total']) if res_futuras else 0.0
 
@@ -630,7 +627,6 @@ def listar_cartoes():
     except Exception as e:
         print("ERRO EM LISTAR CARTOES:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # 3. ROTA PARA RE-VINCULAR TRANSAÇÕES ANTIGAS AO CARTÃO INTER
 @app.get("/cartoes/corrigir-faturas-existentes")
