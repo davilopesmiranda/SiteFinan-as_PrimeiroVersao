@@ -109,12 +109,15 @@ class CartaoSchema(BaseModel):
 
 # --- ROTAS DE TRANSAÇÕES ---
 
+# --- ROTAS DE TRANSAÇÕES ---
+
 @app.get("/transacoes")
 def listar_transacoes():
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
-            sql = "SELECT * FROM transacoes ORDER BY id DESC LIMIT 10"
+            # Tira o LIMIT 10 para trazer todo o histórico no modal/tabela
+            sql = "SELECT * FROM transacoes ORDER BY id DESC"
             cursor.execute(sql)
             resultados = cursor.fetchall()
         connection.close()
@@ -629,28 +632,6 @@ def listar_cartoes():
         raise HTTPException(status_code=500, detail=str(e))
 
 # 3. ROTA PARA RE-VINCULAR TRANSAÇÕES ANTIGAS AO CARTÃO INTER
-@app.get("/cartoes/corrigir-faturas-existentes")
-def corrigir_faturas_existentes():
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            # Ajusta dia do fechamento para 24
-            cursor.execute("UPDATE cartoes SET dia_fechamento = 25 WHERE LOWER(nome) = 'inter'")
-            
-            # Vincula todos os lançamentos de crédito anteriores ao Inter
-            sql = """
-                UPDATE transacoes 
-                SET meio_pagamento = 'Crédito (Inter)' 
-                WHERE tipo = 'SAIDA' 
-                  AND (meio_pagamento LIKE 'Crédito%%' OR meio_pagamento = 'CREDITO')
-            """
-            cursor.execute(sql)
-            afetados = cursor.rowcount
-            connection.commit()
-        connection.close()
-        return {"mensagem": f"{afetados} lançamentos foram vinculados ao cartão Inter com fechamento no dia 25!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/cartoes")
 def criar_cartao(cartao: CartaoSchema):

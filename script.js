@@ -336,44 +336,200 @@ function toggleCartoes(meio) {
     }
 }
 
+// VARIABLES DE ESTADO DOS LANÇAMENTOS E FILTROS
+let todasTransacoesCache = [];
+let transacoesFiltradasCache = [];
+let paginaAtualModal = 1;
+
+// 1. CARREGAR TRANSAÇÕES DO BACKEND E POPULAR TABELAS E FILTROS
 async function carregarTransacoes() {
     try {
         const response = await fetch(`${API_URL}/transacoes`);
         if (!response.ok) return;
 
-        const transacoes = await response.json();
-        const tbody = document.getElementById('tbodyLancamentos');
-        if (!tbody) return;
+        todasTransacoesCache = await response.json();
+        
+        // Renderiza apenas os 10 últimos na tabela principal da aba
+        renderizarTabelaResumida();
 
-        tbody.innerHTML = '';
+        // Popula as opções dos seletores de filtro do modal dinamicamente
+        popularOpcoesFiltro();
 
-        if (transacoes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Nenhum lançamento registrado ainda.</td></tr>';
-            return;
+        // Se o modal estiver aberto, atualiza os dados filtrados
+        const modal = document.getElementById('modalTodosLancamentos');
+        if (modal && modal.classList.contains('active')) {
+            filtrarETabelaModal(paginaAtualModal);
         }
-
-        transacoes.forEach(t => {
-            const tr = document.createElement('tr');
-            const corValor = t.tipo === 'SAIDA' ? 'var(--danger)' : 'var(--forest-light)';
-            const sinal = t.tipo === 'SAIDA' ? '-' : '+';
-            const descEscapada = t.descricao.replace(/'/g, "\\'");
-
-            tr.innerHTML = `
-                <td>${t.descricao}</td>
-                <td>${t.meio_pagamento}</td>
-                <td>Geral</td>
-                <td style="color: ${corValor}; font-weight: 600;">${sinal} R$ ${parseFloat(t.valor).toFixed(2)}</td>
-                <td>
-                    <i class="fa-solid fa-trash-can" style="color: var(--danger); cursor: pointer;" 
-                       title="Apagar Lançamento" 
-                       onclick="apagarTransacao(${t.id}, '${descEscapada}')"></i>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
     } catch (error) {
         console.error("Erro ao carregar transações:", error);
     }
+}
+
+// Renderiza a tabela resumida (últimos 10 lançamentos na aba Lançamentos)
+function renderizarTabelaResumida() {
+    const tbody = document.getElementById('tbodyLancamentos');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    const ultimos10 = todasTransacoesCache.slice(0, 10);
+
+    if (ultimos10.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Nenhum lançamento registrado ainda.</td></tr>';
+        return;
+    }
+
+    ultimos10.forEach(t => {
+        const tr = document.createElement('tr');
+        const corValor = t.tipo === 'SAIDA' ? 'var(--danger)' : 'var(--forest-light)';
+        const sinal = t.tipo === 'SAIDA' ? '-' : '+';
+        const descEscapada = t.descricao.replace(/'/g, "\\'");
+        const meio = t.meio_pagamento || 'PIX';
+        const categoria = t.categoria || 'Geral';
+
+        tr.innerHTML = `
+            <td>${t.descricao}</td>
+            <td>${meio}</td>
+            <td>${categoria}</td>
+            <td style="color: ${corValor}; font-weight: 600;">${sinal} R$ ${parseFloat(t.valor).toFixed(2)}</td>
+            <td>
+                <i class="fa-solid fa-trash-can" style="color: var(--danger); cursor: pointer;" 
+                   title="Apagar Lançamento" 
+                   onclick="apagarTransacao(${t.id}, '${descEscapada}')"></i>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Popula os dropdowns de filtro de Meio de Pagamento e Categoria dinamicamente
+function popularOpcoesFiltro() {
+    const selectMeio = document.getElementById('filtroMeioPagamento');
+    const selectCat = document.getElementById('filtroCategoria');
+
+    if (!selectMeio || !selectCat) return;
+
+    const meiosUnicos = new Set();
+    const categoriasUnicas = new Set();
+
+    todasTransacoesCache.forEach(t => {
+        if (t.meio_pagamento) meiosUnicos.add(t.meio_pagamento);
+        if (t.categoria) categoriasUnicas.add(t.categoria);
+    });
+
+    // Atualiza Meios
+    selectMeio.innerHTML = '<option value="TODOS">Todos os meios</option>';
+    Array.from(meiosUnicos).sort().forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        selectMeio.appendChild(opt);
+    });
+
+    // Atualiza Categorias
+    selectCat.innerHTML = '<option value="TODOS">Todas as categorias</option>';
+    Array.from(categoriasUnicas).sort().forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        selectCat.appendChild(opt);
+    });
+}
+
+// 2. ABRIR MODAL HISTÓRICO COMPLETO
+function abrirModalTodosLancamentos() {
+    const modal = document.getElementById('modalTodosLancamentos');
+    if (!modal) return;
+
+    modal.classList.add('active');
+    filtrarETabelaModal(1);
+}
+
+// 3. APLICA OS FILTROS DE BUSCA, TIPO, MEIO E CATEGORIA
+function filtrarETabelaModal(pagina = 1) {
+    const busca = (document.getElementById('filtroBuscaDescricao')?.value || '').toLowerCase().trim();
+    const tipo = document.getElementById('filtroTipo')?.value || 'TODOS';
+    const meio = document.getElementById('filtroMeioPagamento')?.value || 'TODOS';
+    const categoria = document.getElementById('filtroCategoria')?.value || 'TODOS';
+
+    transacoesFiltradasCache = todasTransacoesCache.filter(t => {
+        const descMatch = (t.descricao || '').toLowerCase().includes(busca);
+        const tipoMatch = tipo === 'TODOS' || t.tipo === tipo;
+        const meioMatch = meio === 'TODOS' || t.meio_pagamento === meio;
+        const catMatch = categoria === 'TODOS' || (t.categoria || 'Geral') === categoria;
+
+        return descMatch && tipoMatch && meioMatch && catMatch;
+    });
+
+    paginaAtualModal = pagina;
+    renderizarPaginaModal();
+}
+
+// 4. RENDERIZA OS ITENS DA PÁGINA SELECIONADA
+function renderizarPaginaModal() {
+    const tbody = document.getElementById('tbodyTodosLancamentos');
+    const labelTotal = document.getElementById('labelTotalFiltro');
+    const labelPagina = document.getElementById('labelPaginaAtual');
+    const btnAnt = document.getElementById('btnPagAnterior');
+    const btnProx = document.getElementById('btnPagProxima');
+
+    if (!tbody) return;
+
+    const itensPorPagina = parseInt(document.getElementById('selectItensPorPagina')?.value || 20);
+    const totalItens = transacoesFiltradasCache.length;
+    const totalPaginas = Math.ceil(totalItens / itensPorPagina) || 1;
+
+    if (paginaAtualModal > totalPaginas) paginaAtualModal = totalPaginas;
+    if (paginaAtualModal < 1) paginaAtualModal = 1;
+
+    const inicio = (paginaAtualModal - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    const paginaItens = transacoesFiltradasCache.slice(inicio, fim);
+
+    if (labelTotal) labelTotal.innerText = `Exibindo ${totalItens} lançamentos encontrados`;
+    if (labelPagina) labelPagina.innerText = `Página ${paginaAtualModal} de ${totalPaginas}`;
+
+    if (btnAnt) btnAnt.disabled = (paginaAtualModal === 1);
+    if (btnProx) btnProx.disabled = (paginaAtualModal >= totalPaginas);
+
+    tbody.innerHTML = '';
+
+    if (paginaItens.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 1.5rem;">Nenhum lançamento encontrado com esses filtros.</td></tr>';
+        return;
+    }
+
+    paginaItens.forEach(t => {
+        const tr = document.createElement('tr');
+        const corValor = t.tipo === 'SAIDA' ? 'var(--danger)' : 'var(--forest-light)';
+        const sinal = t.tipo === 'SAIDA' ? '-' : '+';
+        const descEscapada = t.descricao.replace(/'/g, "\\'");
+        
+        let dataFmt = '-';
+        if (t.data_transacao) {
+            const partes = t.data_transacao.split('T')[0].split('-');
+            if (partes.length === 3) dataFmt = `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+
+        tr.innerHTML = `
+            <td>${dataFmt}</td>
+            <td><strong>${t.descricao}</strong></td>
+            <td>${t.meio_pagamento || 'PIX'}</td>
+            <td>${t.categoria || 'Geral'}</td>
+            <td style="color: ${corValor}; font-weight: 600;">${sinal} R$ ${parseFloat(t.valor).toFixed(2)}</td>
+            <td style="text-align: center;">
+                <i class="fa-solid fa-trash-can" style="color: var(--danger); cursor: pointer;" 
+                   title="Apagar Lançamento" 
+                   onclick="apagarTransacao(${t.id}, '${descEscapada}')"></i>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// NAVEGAÇÃO DE PÁGINAS DO MODAL
+function mudarPaginaModal(delta) {
+    paginaAtualModal += delta;
+    renderizarPaginaModal();
 }
 
 async function apagarTransacao(id, descricao) {

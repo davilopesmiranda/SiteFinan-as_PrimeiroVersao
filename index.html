@@ -212,7 +212,13 @@
 
         <!-- TABELA DE ÚLTIMOS LANÇAMENTOS -->
         <div style="margin-top: 2.5rem; width: 100%;">
-            <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 0.8rem;">Últimos Lançamentos Registrados</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                <h3 style="font-size: 1rem; color: var(--text-muted); margin: 0;">Últimos Lançamentos Registrados</h3>
+                <button class="btn-quick-amount" onclick="abrirModalTodosLancamentos()" style="width: auto; padding: 6px 14px;">
+                    <i class="fa-solid fa-expand"></i> Ver Todos os Lançamentos
+                </button>
+            </div>
+
             <table class="custom-table">
                 <thead>
                     <tr>
@@ -227,9 +233,14 @@
                     <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum lançamento registrado.</td></tr>
                 </tbody>
             </table>
+
+            <!-- Botão expansor abaixo da tabela -->
+            <div style="text-align: center; margin-top: 1rem;">
+                <button class="btn-submit" onclick="abrirModalTodosLancamentos()" style="background: var(--bg-hover); color: var(--text-main); display: inline-flex; width: auto; padding: 8px 24px; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-list-ul"></i> Ver Histórico Completo & Filtrar Lançamentos
+                </button>
+            </div>
         </div>
-    </div>
-</div>
 
             <!-- ABA 3: INVESTIMENTOS -->
             <div id="tab-investimentos" class="tab-content">
@@ -552,7 +563,93 @@
             </div>
         </div>
     </div>
+    <!-- MODAL HISTÓRICO COMPLETO DE LANÇAMENTOS COM FILTROS E PAGINAÇÃO -->
+    <div class="modal-overlay" id="modalTodosLancamentos">
+        <div class="modal-card" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                <h3 style="margin: 0;"><i class="fa-solid fa-list-check"></i> Todos os Lançamentos Registrados</h3>
+                <button onclick="fecharModais()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);"><i class="fa-solid fa-xmark"></i></button>
+            </div>
 
+            <!-- ÁREA DE BUSCA E FILTROS -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1.2rem; background: var(--bg-secondary); padding: 12px; border-radius: 8px;">
+                <!-- Busca por Descrição -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-size: 0.75rem;">Buscar por Descrição</label>
+                    <input type="text" id="filtroBuscaDescricao" class="form-control" placeholder="Digite para buscar..." oninput="filtrarETabelaModal(1)">
+                </div>
+                <!-- Filtro Tipo (Entrada/Saída) -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-size: 0.75rem;">Tipo</label>
+                    <select id="filtroTipo" class="form-control" onchange="filtrarETabelaModal(1)">
+                        <option value="TODOS">Todos os tipos</option>
+                        <option value="SAIDA">Saídas (Gastos)</option>
+                        <option value="ENTRADA">Entradas (Receitas)</option>
+                    </select>
+                </div>
+                <!-- Filtro Meio de Pagamento -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-size: 0.75rem;">Meio de Pagamento / Cartão</label>
+                    <select id="filtroMeioPagamento" class="form-control" onchange="filtrarETabelaModal(1)">
+                        <option value="TODOS">Todos os meios</option>
+                    </select>
+                </div>
+                <!-- Filtro Categoria -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-size: 0.75rem;">Categoria</label>
+                    <select id="filtroCategoria" class="form-control" onchange="filtrarETabelaModal(1)">
+                        <option value="TODOS">Todas as categorias</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- CONTADOR DE REGISTROS -->
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
+                <span id="labelTotalFiltro">Exibindo 0 lançamentos</span>
+                <div>
+                    <label style="font-size: 0.8rem;">Itens por página: </label>
+                    <select id="selectItensPorPagina" onchange="filtrarETabelaModal(1)" style="padding: 2px 6px; border-radius: 4px; background: var(--bg-primary); color: var(--text-main); border: 1px solid var(--border-color);">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- TABELA COM SCROLL -->
+            <div style="flex: 1; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem;">
+                <table class="custom-table" style="margin: 0;">
+                    <thead style="position: sticky; top: 0; background: var(--bg-primary); z-index: 10;">
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Meio / Cartão</th>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                            <th style="text-align: center;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyTodosLancamentos">
+                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- CONTROLES DE PAGINAÇÃO -->
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                <button id="btnPagAnterior" class="btn-quick-amount" onclick="mudarPaginaModal(-1)" style="width: auto;">
+                    <i class="fa-solid fa-chevron-left"></i> Anterior
+                </button>
+                <span id="labelPaginaAtual" style="font-size: 0.9rem; font-weight: 500;">Página 1 de 1</span>
+                <button id="btnPagProxima" class="btn-quick-amount" onclick="mudarPaginaModal(1)" style="width: auto;">
+                    Próxima <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
