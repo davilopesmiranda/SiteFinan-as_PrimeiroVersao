@@ -257,8 +257,6 @@ async function salvarLancamento(event) {
     const valor = parseFloat(inputValor.value);
     const descricao = inputDescricao.value.trim();
     const tipo = btnSaida && btnSaida.classList.contains('active') ? 'SAIDA' : 'ENTRADA';
-
-    // Pega a categoria correta dependendo do tipo selecionado
     const categoria = tipo === 'SAIDA' 
         ? (selectCatSaida ? selectCatSaida.value : 'Geral')
         : (selectCatEntrada ? selectCatEntrada.value : 'Receita');
@@ -272,6 +270,7 @@ async function salvarLancamento(event) {
         ? `Receita (${categoria})` 
         : (selectMeio ? selectMeio.value : 'PIX');
 
+    // Se for Cartão de Crédito manual, valida qual cartão foi escolhido
     if (tipo === 'SAIDA' && meioPagamentoFinal === 'CREDITO') {
         const cartaoEscolhido = selectCartao ? selectCartao.value.trim() : '';
         if (cartaoEscolhido) {
@@ -308,6 +307,7 @@ async function salvarLancamento(event) {
             carregarTransacoes();
             carregarResumoDashboard();
             carregarGraficoEvolucao();
+            carregarCartoes();
         } else {
             const erroData = await response.json();
             alert(`Erro ao salvar: ${erroData.detail || 'Falha no servidor'}`);
@@ -317,7 +317,6 @@ async function salvarLancamento(event) {
         alert("Erro ao conectar com o servidor.");
     }
 }
-
 function addValor(valor) {
     const input = document.getElementById('inputValor');
     if (!input) return;
